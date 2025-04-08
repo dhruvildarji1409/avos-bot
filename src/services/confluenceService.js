@@ -399,100 +399,261 @@ class ConfluenceService {
   }
 
   /**
-   * Store page content in MongoDB with embeddings
+   * Store a page and generate embeddings for it and its sections
    */
   async storePageWithEmbeddings(ConfluenceData, page, addedBy) {
     try {
-      const { id, title, content, url } = page;
+      // Clean the HTML content to extract useful text
+      const cleanedContent = this.cleanHtmlContent(page.content);
       
-      // Check if this page already exists
-      const existingPage = await ConfluenceData.findOne({ 
-        $or: [
-          { url },
-          { url: `${this.confluenceHost}/pages/viewpage.action?pageId=${id}` }
-        ]
-      });
+      // Check if page already exists
+      let existingPage = await ConfluenceData.findOne({ pageId: page.id });
       
-      // Create clean text version for embedding
-      const cleanText = this.cleanHtmlContent(content);
+      // Extract space information if available
+      const urlObj = new URL(page.url);
+      const pathParts = urlObj.pathname.split('/');
+      const params = new URLSearchParams(urlObj.search);
       
-      // Generate embedding for the content
-      const embedding = await getEmbedding(title + " " + cleanText);
+      let spaceKey = params.get('spaceKey') || '';
+      let spaceName = '';
       
+      if (pathParts.includes('spaces') && pathParts.length > pathParts.indexOf('spaces') + 1) {
+        spaceKey = pathParts[pathParts.indexOf('spaces') + 1];
+      }
+      
+      // Extract page sections
+      const sections = this.chunkContentByHeaders(page.content, page.id);
+      
+      // Generate embeddings for sections
+      const processedSections = await Promise.all(sections.map(async (section, index) => {
+        try {
+          const embedding = await getEmbedding(section.full_context);
+          return {
+            heading: section.header,
+            content: section.content,
+            level: section.level,
+            order: index,
+            embedding
+          };
+        } catch (err) {
+          console.error(`Error generating embedding for section: ${err.message}`);
+          return {
+            heading: section.header,
+            content: section.content,
+            level: section.level,
+            order: index,
+            embedding: []
+          };
+        }
+      }));
+      
+      // Generate an embedding for the whole page
+      let pageEmbedding = [];
+      try {
+        // Generate embedding from title + first section or title + truncated content
+        const embeddingText = page.title + '\n\n' + (sections.length > 0 ? 
+          sections[0].full_context.substring(0, 1000) :
+          cleanedContent.substring(0, 1000));
+          
+        pageEmbedding = await getEmbedding(embeddingText);
+      } catch (err) {
+        console.error(`Error generating page embedding: ${err.message}`);
+      }
+      
+      // Build metadata array
+      const metadata = [
+        { key: 'pageId', value: page.id },
+        { key: 'spaceKey', value: spaceKey },
+        { key: 'lastExtracted', value: new Date().toISOString() }
+      ];
+      
+      // If page exists, update it
       if (existingPage) {
-        // Update existing page
-        existingPage.title = title;
-        existingPage.content = content;
-        existingPage.processedContent = cleanText;
-        existingPage.embedding = embedding;
-        existingPage.addedBy = addedBy;
-        existingPage.hasChildren = page.children && page.children.length > 0;
+        console.log(`Updating existing page: ${page.title}`);
+        
+        existingPage.title = page.title;
+        existingPage.content = page.content;
+        existingPage.processedContent = cleanedContent;
+        existingPage.lastUpdated = new Date();
+        existingPage.embedding = pageEmbedding;
+        existingPage.sections = processedSections;
+        existingPage.spaceKey = spaceKey;
+        existingPage.spaceName = spaceName;
+        existingPage.metadata = metadata;
+        existingPage.formatVersion = 2;
+        
         if (page.parentId) {
           existingPage.parentId = page.parentId;
         }
         
+        // Update child relationships if available
+        if (page.children && page.children.length > 0) {
+          existingPage.hasChildren = true;
+          existingPage.childIds = page.children.map(child => child.id);
+        }
+        
         await existingPage.save();
         return existingPage;
-      } else {
-        // Create new page
-        const newPage = new ConfluenceData({
-          title,
-          content,
-          processedContent: cleanText,
-          embedding,
-          url,
-          addedBy,
-          tags: ['AVOS'],
-          hasChildren: page.children && page.children.length > 0,
-          parentId: page.parentId || undefined
-        });
-        
-        await newPage.save();
-        return newPage;
       }
+      
+      // Create new page
+      console.log(`Creating new page: ${page.title}`);
+      const newPage = new ConfluenceData({
+        title: page.title,
+        content: page.content,
+        processedContent: cleanedContent,
+        url: page.url,
+        pageId: page.id,
+        embedding: pageEmbedding,
+        sections: processedSections,
+        addedBy: addedBy || 'System',
+        spaceKey,
+        spaceName,
+        metadata,
+        formatVersion: 2,
+        tags: ['confluence', spaceKey]
+      });
+      
+      if (page.parentId) {
+        newPage.parentId = page.parentId;
+      }
+      
+      // Set child relationships if available
+      if (page.children && page.children.length > 0) {
+        newPage.hasChildren = true;
+        newPage.childIds = page.children.map(child => child.id);
+      }
+      
+      await newPage.save();
+      return newPage;
     } catch (error) {
-      console.error(`Error storing page: ${error.message}`);
+      console.error('Error storing page with embeddings:', error);
       throw error;
     }
   }
 
   /**
-   * Clean HTML content for embeddings
+   * Clean HTML content and extract plain text
    */
   cleanHtmlContent(html) {
-    const $ = cheerio.load(html);
-    
-    // Remove script and style tags
-    $('script, style').remove();
-    
-    // Extract text, preserving some structure
-    let text = '';
-    
-    // Process headers
-    $('h1, h2, h3, h4, h5, h6').each((i, el) => {
-      text += `${$(el).text().trim()}\n`;
-    });
-    
-    // Process paragraphs and list items
-    $('p, li').each((i, el) => {
-      text += `${$(el).text().trim()}\n`;
-    });
-    
-    // Process tables
-    $('table').each((i, table) => {
-      $(table).find('tr').each((j, row) => {
-        const rowText = [];
-        $(row).find('th, td').each((k, cell) => {
-          rowText.push($(cell).text().trim());
-        });
-        text += rowText.join(' | ') + '\n';
+    try {
+      const $ = cheerio.load(html);
+      
+      // Remove script and style elements
+      $('script, style, svg, .hidden, .aui-icon').remove();
+      
+      // Replace some elements with their text representation
+      $('br').replaceWith('\n');
+      $('p, div, li, h1, h2, h3, h4, h5, h6').each((i, el) => {
+        $(el).append('\n');
       });
-    });
+      
+      // Special handling for code blocks
+      $('pre, code').each((i, el) => {
+        const text = $(el).text();
+        $(el).replaceWith(`\`\`\`\n${text}\n\`\`\``);
+      });
+      
+      // Special handling for tables
+      $('table').each((i, table) => {
+        $(table).find('tr').each((j, row) => {
+          $(row).find('th, td').each((k, cell) => {
+            $(cell).append(' | ');
+          });
+          $(row).append('\n');
+        });
+      });
+      
+      // Extract text and clean whitespace
+      let text = $.text();
+      
+      // Normalize whitespace
+      text = text.replace(/\s+/g, ' ');
+      
+      // Replace multiple newlines with just two
+      text = text.replace(/\n{3,}/g, '\n\n');
+      
+      return text.trim();
+    } catch (error) {
+      console.error('Error cleaning HTML content:', error);
+      return html; // Return original HTML if there's an error
+    }
+  }
+  
+  /**
+   * Process a Confluence page in depth with structured extraction
+   */
+  async processPageStructured(pageUrl, options = {}) {
+    const defaultOptions = {
+      extractSections: true,
+      maxDepth: 1,
+      processChildren: true,
+      includeMetadata: true
+    };
     
-    // Normalize whitespace
-    text = text.replace(/\s+/g, ' ').trim();
+    const processOptions = { ...defaultOptions, ...options };
     
-    return text;
+    try {
+      // Get page content
+      const page = await this.getPageContent(pageUrl);
+      if (!page) {
+        throw new Error(`Could not fetch page content from ${pageUrl}`);
+      }
+      
+      // Extract metadata if enabled
+      if (processOptions.includeMetadata) {
+        // Extract space information
+        const urlObj = new URL(pageUrl);
+        const pathParts = urlObj.pathname.split('/');
+        const params = new URLSearchParams(urlObj.search);
+        
+        page.metadata = {
+          spaceKey: params.get('spaceKey') || '',
+          lastExtracted: new Date().toISOString(),
+          pageId: page.id
+        };
+        
+        if (pathParts.includes('spaces') && pathParts.length > pathParts.indexOf('spaces') + 1) {
+          page.metadata.spaceKey = pathParts[pathParts.indexOf('spaces') + 1];
+        }
+      }
+      
+      // Extract sections if enabled
+      if (processOptions.extractSections) {
+        page.sections = this.chunkContentByHeaders(page.content, page.id);
+      }
+      
+      // Process children if enabled and not at max depth
+      if (processOptions.processChildren && processOptions.maxDepth > 0) {
+        page.processedChildren = [];
+        
+        // Process direct children from API
+        if (page.children && page.children.length > 0) {
+          for (const child of page.children) {
+            const childUrl = `${this.confluenceHost}/pages/viewpage.action?pageId=${child.id}`;
+            
+            try {
+              const childPage = await this.processPageStructured(childUrl, {
+                ...processOptions,
+                maxDepth: processOptions.maxDepth - 1
+              });
+              
+              if (childPage) {
+                childPage.parentId = page.id;
+                page.processedChildren.push(childPage);
+              }
+            } catch (err) {
+              console.error(`Error processing child page: ${err.message}`);
+            }
+          }
+        }
+      }
+      
+      return page;
+    } catch (error) {
+      console.error(`Error processing page structure: ${error.message}`);
+      throw error;
+    }
   }
 }
 

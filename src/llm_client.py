@@ -155,7 +155,7 @@ def get_simulated_response(prompt, context=""):
     
     return response
 
-def get_llm_response(prompt, context="", system_prompt=""):
+def get_llm_response(prompt, context="", system_prompt="", conversation_history_json="[]"):
     """Get response from LLM, falling back to simulated responses if unavailable."""
     if DEPENDENCIES_INSTALLED:
         try:
@@ -174,6 +174,14 @@ def get_llm_response(prompt, context="", system_prompt=""):
                         "role": "system", 
                         "content": get_default_system_prompt()
                     })
+                
+                # Add conversation history if provided
+                try:
+                    conversation_history = json.loads(conversation_history_json)
+                    if conversation_history and isinstance(conversation_history, list):
+                        messages.extend(conversation_history)
+                except Exception as e:
+                    print(f"Error parsing conversation history: {e}", file=sys.stderr)
                 
                 # Add context if provided
                 if context:
@@ -203,14 +211,16 @@ if __name__ == "__main__":
     # arg1: user prompt
     # arg2 (optional): context
     # arg3 (optional): system prompt
+    # arg4 (optional): conversation history JSON
     
     if len(sys.argv) < 2:
-        print("Usage: python llm_client.py \"prompt\" [\"context\"] [\"system_prompt\"]")
+        print("Usage: python llm_client.py \"prompt\" [\"context\"] [\"system_prompt\"] [\"conversation_history_json\"]")
         sys.exit(1)
     
     prompt = sys.argv[1]
     context = sys.argv[2] if len(sys.argv) > 2 else ""
     system_prompt = sys.argv[3] if len(sys.argv) > 3 else ""
+    conversation_history_json = sys.argv[4] if len(sys.argv) > 4 else "[]"
     
-    response = get_llm_response(prompt, context, system_prompt)
+    response = get_llm_response(prompt, context, system_prompt, conversation_history_json)
     print(response) 

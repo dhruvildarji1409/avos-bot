@@ -3,30 +3,88 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AVOS Chat Bot</title>
+    <title>AVOS Bot</title>
     <link rel="stylesheet" href="styles.css">
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
-    <div class="chat-container">
-        <div class="chat-header">
-            <h1>AVOS Chat Bot</h1>
-            <p>Ask anything about AVOS</p>
-            <a href="/admin.html" class="admin-link">Admin Panel</a>
-        </div>
-        <div class="chat-messages" id="chat-messages">
-            <!-- Messages will be appended here -->
-            <div class="message bot">
-                <div class="message-content">
-                    <p>Hello! I'm the AVOS Bot. How can I help you today?</p>
+    <div class="app-container">
+        <!-- Chat sidebar for session management -->
+        <div class="chat-sidebar">
+            <div class="sidebar-header">
+                <h2>AVOS Bot</h2>
+                <button id="new-chat-btn" class="new-chat-btn">
+                    <i class="fas fa-plus"></i> New Chat
+                </button>
+            </div>
+            <div class="chat-sessions-container">
+                <div class="chat-sessions" id="chat-sessions-list">
+                    <!-- Chat sessions will be dynamically added here -->
                 </div>
             </div>
         </div>
-        <div class="chat-input">
-            <textarea id="user-input" placeholder="Type your message here..."></textarea>
-            <button id="send-button">Send</button>
+
+        <!-- Main chat area -->
+        <div class="chat-container">
+            <div class="chat-header">
+                <div class="current-chat-info">
+                    <span id="current-chat-name">New Chat</span>
+                    <div class="chat-actions">
+                        <button id="rename-chat-btn" title="Rename Chat">
+                            <i class="fas fa-edit"></i>
+                        </button>
+                        <button id="clear-chat-btn" title="Clear Chat">
+                            <i class="fas fa-broom"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="chat-messages" id="chat-messages">
+                <div class="welcome-message">
+                    <h1>Welcome to Chat Bot</h1>
+                    <p>Ask me anything about NVIDIA's technologies</p>
+                </div>
+            </div>
+            
+            <div class="chat-input-container">
+                <div class="chat-input">
+                    <textarea id="message-input" placeholder="Type your message here..."></textarea>
+                    <button id="send-btn">
+                        <i class="fas fa-paper-plane"></i>
+                    </button>
+                </div>
+                <div class="typing-indicator" id="typing-indicator">
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                </div>
+            </div>
         </div>
     </div>
+
+    <!-- Modals -->
+    <div id="rename-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2>Rename Chat</h2>
+            <input type="text" id="new-chat-name" placeholder="Enter a new name">
+            <button id="save-chat-name">Save</button>
+        </div>
+    </div>
+
+    <div id="confirm-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal">&times;</span>
+            <h2 id="confirm-title">Confirm Action</h2>
+            <p id="confirm-message">Are you sure you want to perform this action?</p>
+            <div class="modal-buttons">
+                <button id="confirm-cancel">Cancel</button>
+                <button id="confirm-ok">OK</button>
+            </div>
+        </div>
+    </div>
+
     <script src="script.js"></script>
 </body>
 </html> 
