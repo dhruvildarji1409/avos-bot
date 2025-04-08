@@ -1,0 +1,4 @@
+https://confluence.nvidia.com/display/~kballa/Kedareswar+AVOS-Info
+https://confluence.nvidia.com/display/DSW/Startup+cmd+DTSI+architecture+and+Cleanup
+https://confluence.nvidia.com/display/DSW/HOW+TO%3A+Generate+Hyp8.1+DDU+image+locally
+https://confluence.nvidia.com/display/DSW/HOW+TO%3A+Generate+THOR+DDU+AVOS+image+with+DOS+container
