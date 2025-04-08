@@ -604,4 +604,116 @@ exports.refreshPage = async (req, res) => {
     console.error('Error refreshing page:', error);
     res.status(500).json({ success: false, message: error.message });
   }
+};
+
+/**
+ * Get section details of a specific Confluence page for debugging
+ */
+exports.getPageSections = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const page = await ConfluenceData.findById(id);
+    
+    if (!page) {
+      return res.status(404).json({ success: false, message: 'Page not found' });
+    }
+    
+    // Extract page information
+    const pageInfo = {
+      id: page._id,
+      title: page.title,
+      url: page.url,
+      addedBy: page.addedBy,
+      addedAt: page.addedAt,
+      formatVersion: page.formatVersion || 1,
+      spaceKey: page.spaceKey,
+      hasEmbedding: page.embedding && page.embedding.length > 0
+    };
+    
+    // Extract section information
+    const sectionInfo = page.sections && page.sections.length > 0 
+      ? page.sections.map((section, index) => ({
+          heading: section.heading,
+          content: section.content,
+          level: section.level,
+          order: section.order || index,
+          hasEmbedding: section.embedding && section.embedding.length > 0,
+          contentLength: section.content.length
+        }))
+      : [];
+      
+    // If page has no sections but has content, create a mock section from the full content
+    if (sectionInfo.length === 0 && page.content) {
+      // Use the cheerio parser to extract headers and content
+      const $ = cheerio.load(page.content);
+      const headers = [];
+      
+      // Find all headers in the content
+      $('h1, h2, h3, h4, h5, h6').each(function() {
+        const level = parseInt(this.tagName.substring(1));
+        headers.push({
+          text: $(this).text().trim(),
+          level,
+          element: this
+        });
+      });
+      
+      // If headers were found, create mock sections
+      if (headers.length > 0) {
+        let mockSections = [];
+        
+        // For each header, extract content until the next header
+        headers.forEach((header, i) => {
+          let contentElements = [];
+          let currentElement = header.element;
+          
+          // Collect elements until the next header or end of content
+          while ((currentElement = currentElement.nextSibling) !== null) {
+            if (currentElement.tagName && /^h[1-6]$/.test(currentElement.tagName.toLowerCase())) {
+              break;
+            }
+            if (currentElement.type === 'tag') {
+              contentElements.push($(currentElement).html());
+            }
+          }
+          
+          mockSections.push({
+            heading: header.text,
+            content: contentElements.join('\n'),
+            level: header.level,
+            order: i,
+            hasEmbedding: false,
+            contentLength: contentElements.join('\n').length,
+            isMocked: true
+          });
+        });
+        
+        sectionInfo.push(...mockSections);
+      } else {
+        // If no headers, create single mock section with full content
+        sectionInfo.push({
+          heading: page.title,
+          content: page.processedContent || page.content.substring(0, 10000),
+          level: 0,
+          order: 0,
+          hasEmbedding: false,
+          contentLength: (page.processedContent || page.content).length,
+          isMocked: true
+        });
+      }
+    }
+    
+    res.json({
+      success: true,
+      page: pageInfo,
+      sections: sectionInfo,
+      totalSections: sectionInfo.length,
+      rawContentLength: page.content.length,
+      processedContentLength: page.processedContent ? page.processedContent.length : 0
+    });
+  } catch (error) {
+    console.error('Error getting page sections:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
 }; 

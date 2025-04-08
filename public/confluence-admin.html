@@ -101,6 +101,15 @@
       display: flex;
       gap: 5px;
     }
+    .button.info {
+      background-color: #e6f7ff;
+      color: #1890ff;
+      border-color: #91d5ff;
+    }
+    .button.info:hover {
+      background-color: #bae7ff;
+      border-color: #1890ff;
+    }
     .tab-container {
       margin-bottom: 20px;
     }
@@ -412,6 +421,7 @@
               <td>
                 <div class="btn-group">
                   <button class="button small view-btn" data-id="${page._id}">View</button>
+                  <button class="button small info debug-sections-btn" data-id="${page._id}">Debug Sections</button>
                   <button class="button small secondary refresh-btn" data-id="${page._id}">Refresh</button>
                 </div>
               </td>
@@ -479,6 +489,7 @@
               <td>
                 <div class="btn-group">
                   <button class="button small view-btn" data-id="${page._id}">View</button>
+                  <button class="button small info debug-sections-btn" data-id="${page._id}">Debug Sections</button>
                   <button class="button small secondary refresh-btn" data-id="${page._id}">Refresh</button>
                   <button class="button small danger delete-btn" data-id="${page._id}">Delete</button>
                 </div>
@@ -666,6 +677,12 @@
         if (e.target.classList.contains('view-btn')) {
           const id = e.target.getAttribute('data-id');
           window.open(`/index.html?doc=${id}`, '_blank');
+        }
+        
+        // Debug sections button
+        if (e.target.classList.contains('debug-sections-btn')) {
+          const id = e.target.getAttribute('data-id');
+          window.location.href = `/confluence-section-debug.html?id=${id}`;
         }
         
         // Refresh button

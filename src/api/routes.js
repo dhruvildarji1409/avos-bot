@@ -44,6 +44,7 @@ router.get('/confluence/:id', confluenceController.getConfluenceData); // Keep p
 // Confluence admin routes (protected)
 router.get('/confluence/admin/pages', authMiddleware, confluenceController.getAllPages);
 router.get('/confluence/admin/pages/:id', authMiddleware, confluenceController.getPageDetails);
+router.get('/confluence/admin/pages/:id/sections', authMiddleware, confluenceController.getPageSections);
 router.post('/confluence/admin/pages', authMiddleware, confluenceController.addPageByUrl);
 router.post('/confluence/admin/spaces', authMiddleware, confluenceController.processSpace);
 router.delete('/confluence/admin/pages/:id', authMiddleware, confluenceController.deletePage);
