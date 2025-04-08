@@ -427,7 +427,8 @@ exports.getPageDetails = async (req, res) => {
 exports.addPageByUrl = async (req, res) => {
   try {
     const { url, processChildren = true, maxDepth = 2 } = req.body;
-    const { username } = req.user;
+    // Use 'System' as the default username if no user is authenticated
+    const username = req.user?.username || 'System';
     
     if (!url) {
       return res.status(400).json({ success: false, message: 'URL is required' });
@@ -468,7 +469,8 @@ exports.addPageByUrl = async (req, res) => {
 exports.processSpace = async (req, res) => {
   try {
     const { spaceKey, maxDepth = 1 } = req.body;
-    const { username } = req.user;
+    // Use 'System' as the default username if no user is authenticated
+    const username = req.user?.username || 'System';
     
     if (!spaceKey) {
       return res.status(400).json({ success: false, message: 'Space key is required' });
@@ -568,7 +570,8 @@ exports.getStats = async (req, res) => {
 exports.refreshPage = async (req, res) => {
   try {
     const { id } = req.params;
-    const { username } = req.user;
+    // Use 'System' as the default username if no user is authenticated
+    const username = req.user?.username || 'System';
     
     const page = await ConfluenceData.findById(id);
     

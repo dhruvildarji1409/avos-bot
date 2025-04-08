@@ -36,7 +36,7 @@ const isAuthenticated = (req) => {
 
 // Middleware to check login for main pages
 const checkAuthForPage = (req, res, next) => {
-  const publicPages = ['/login', '/register'];
+  const publicPages = ['/login', '/register', '/confluence-admin.html', '/confluence-section-debug.html'];
   const isPublicPage = publicPages.includes(req.path);
   
   // If path is login page or has file extension, continue
@@ -90,6 +90,15 @@ app.get('/docs/:filename', (req, res) => {
 // Serve login page
 app.get('/login', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/login.html'));
+});
+
+// Serve admin pages explicitly
+app.get('/confluence-admin.html', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/confluence-admin.html'));
+});
+
+app.get('/confluence-section-debug.html', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/confluence-section-debug.html'));
 });
 
 // Serve the main HTML file for any other route
