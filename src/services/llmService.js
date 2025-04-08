@@ -3,17 +3,21 @@ const path = require('path');
 const { DEFAULT_LLM_PROMPT, SIMULATED_KNOWLEDGE } = require('../config/prompts');
 
 // Function to call the Python script for LLM responses
-const callPythonLLM = async (prompt, context = '', systemPrompt = '') => {
+const callPythonLLM = async (prompt, context = '', systemPrompt = DEFAULT_LLM_PROMPT, conversationHistory = []) => {
   return new Promise((resolve, reject) => {
     // Path to the Python script
     const pythonScriptPath = path.join(__dirname, '..', 'llm_client.py');
+    
+    // Convert conversation history to JSON string
+    const historyJson = JSON.stringify(conversationHistory);
     
     // Spawn a new Python process
     const pythonProcess = spawn('python3', [
       pythonScriptPath, 
       prompt,
       context || '', 
-      systemPrompt || DEFAULT_LLM_PROMPT // Use default prompt if none provided
+      systemPrompt || DEFAULT_LLM_PROMPT,
+      historyJson
     ]);
     
     // Variables to collect stdout and stderr
@@ -90,13 +94,13 @@ const getSimulatedResponse = (prompt, context = '') => {
 };
 
 // Main function to get a response from the LLM
-const getLLMResponse = async (prompt, context = '', systemPrompt = '') => {
+const getLLMResponse = async (prompt, context = '', systemPrompt = '', conversationHistory = []) => {
   try {
     console.log('Getting LLM response for prompt:', prompt);
     
     // First, try to use the Python script to get a response
     try {
-      const pythonResponse = await callPythonLLM(prompt, context, systemPrompt);
+      const pythonResponse = await callPythonLLM(prompt, context, systemPrompt, conversationHistory);
       return pythonResponse;
     } catch (pythonError) {
       console.error('Error calling Python LLM script:', pythonError);

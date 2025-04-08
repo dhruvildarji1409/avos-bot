@@ -2,27 +2,43 @@ const express = require('express');
 const chatController = require('../controllers/chatController');
 const chatBotController = require('../controllers/chatBotController');
 const confluenceController = require('../controllers/confluenceController');
+const authController = require('../controllers/authController');
+const authMiddleware = require('../middlewares/authMiddleware');
 
 const router = express.Router();
 
-// Chat history routes
-router.post('/chat-history', chatController.createChatHistory);
-router.get('/chat-history/:userId', chatController.getChatHistory);
-router.delete('/chat-history/:userId', chatController.deleteChatHistory);
+// Auth routes
+router.post('/auth/register', authController.register);
+router.post('/auth/login', authController.login);
+router.get('/auth/me', authMiddleware, authController.getCurrentUser);
+
+// Chat history routes - protected
+router.post('/chat-history', authMiddleware, chatController.createChatHistory);
+router.get('/chat-history/:userId', chatController.getChatHistory); // Keep public for shared chats
+router.delete('/chat-history/:userId', authMiddleware, chatController.deleteChatHistory);
 
 // Enhanced sharing routes
-router.post('/chat-history/share', chatController.shareChatHistory);
-router.get('/chat-history/shared/:userId', chatController.getSharedChatHistories);
-router.post('/chat-history/:userId/share', chatController.generateShareableLink);
-router.get('/chat-history/token/:token', chatController.getChatHistoryByShareToken);
+router.post('/chat-history/share', authMiddleware, chatController.shareChatHistory);
+router.get('/chat-history/shared/:userId', authMiddleware, chatController.getSharedChatHistories);
+router.post('/chat-history/:userId/share', chatController.generateShareableLink); // Keep public for shared links
+router.get('/chat-history/token/:token', chatController.getChatHistoryByShareToken); // Keep public for share tokens
 
-// Chat bot route
+// Chat bot route - protected for logged in users, but allow anonymous
 router.post('/chat', chatBotController.handleChatMessage);
 
-// Confluence data routes
-router.post('/confluence', confluenceController.addConfluenceData);
-router.get('/confluence/search', confluenceController.searchConfluenceData);
-router.post('/confluence/fetch', confluenceController.fetchAndStoreConfluenceData);
-router.get('/confluence/:id', confluenceController.getConfluenceData);
+// Chat Session routes - protected
+router.get('/chat-sessions/:userId', authMiddleware, chatController.getUserChatSessions);
+router.post('/chat-sessions', authMiddleware, chatController.createChatSession);
+router.get('/chat-sessions/:userId/:sessionId', authMiddleware, chatController.getChatSessionMessages);
+router.post('/chat-sessions/set-active', authMiddleware, chatController.setActiveSession);
+router.delete('/chat-sessions/:userId/:sessionId', authMiddleware, chatController.deleteChatSession);
+router.put('/chat-sessions/:userId/:sessionId/clear', authMiddleware, chatController.clearChatSession);
+router.put('/chat-sessions/rename', authMiddleware, chatController.renameChatSession);
+
+// Confluence data routes - protected
+router.post('/confluence', authMiddleware, confluenceController.addConfluenceData);
+router.get('/confluence/search', confluenceController.searchConfluenceData); // Keep public for searching
+router.post('/confluence/fetch', authMiddleware, confluenceController.fetchAndStoreConfluenceData);
+router.get('/confluence/:id', confluenceController.getConfluenceData); // Keep public for viewing
 
 module.exports = router; 

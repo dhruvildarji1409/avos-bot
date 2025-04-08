@@ -1,13 +1,16 @@
 const ChatHistory = require('../models/ChatHistory');
 const ConfluenceData = require('../models/ConfluenceData');
+const User = require('../models/User');
 const llmService = require('../services/llmService');
 const { getEmbedding, computeSimilarity } = require('../services/embeddingService');
 const { MAIN_SYSTEM_PROMPT, FALLBACK_RESPONSES } = require('../config/prompts');
+const { v4: uuidv4 } = require('uuid');
+const mongoose = require('mongoose');
 
 // Handle chat messages
 exports.handleChatMessage = async (req, res) => {
   try {
-    const { userId, message } = req.body;
+    const { userId, message, sessionId } = req.body;
     
     if (!userId || !message) {
       return res.status(400).json({ error: 'UserId and message are required' });
@@ -87,10 +90,79 @@ exports.handleChatMessage = async (req, res) => {
       }
     }
     
+    // Find the user to associate with chat history
+    let chatHistory = null;
+    
+    // If userId is a valid MongoDB ObjectId, try to find the user and their chat history
+    if (mongoose.Types.ObjectId.isValid(userId)) {
+      try {
+        const user = await User.findById(userId);
+        if (user) {
+          // Find chat history by user reference
+          chatHistory = await ChatHistory.findOne({ user: user._id });
+          
+          // If no chat history found for this user, create a new one
+          if (!chatHistory) {
+            chatHistory = new ChatHistory({
+              user: user._id,
+              sessions: [],
+              activeSessionId: null
+            });
+          }
+        }
+      } catch (err) {
+        console.error('Error finding user:', err);
+        // Continue to fallback method
+      }
+    }
+    
+    // Fallback to old method - find by userId string if we don't have a chat history yet
+    if (!chatHistory) {
+      chatHistory = await ChatHistory.findOne({ userId });
+      
+      // Create new chat history if none exists
+      if (!chatHistory) {
+        chatHistory = new ChatHistory({
+          userId,
+          sessions: [],
+          activeSessionId: null
+        });
+      }
+    }
+    
+    // Get active session or create new one if none exists
+    let activeSession;
+    let activeSessionId = sessionId || chatHistory.activeSessionId;
+    
+    if (activeSessionId) {
+      activeSession = chatHistory.sessions.find(s => s.sessionId === activeSessionId);
+    }
+    
+    // If no active session or specified session not found, create a new one
+    if (!activeSession) {
+      const newSessionId = uuidv4();
+      activeSession = {
+        sessionId: newSessionId,
+        sessionName: `Chat ${new Date().toLocaleDateString()}`,
+        messages: [],
+        createdAt: new Date(),
+        lastUpdatedAt: new Date()
+      };
+      
+      chatHistory.sessions.push(activeSession);
+      chatHistory.activeSessionId = newSessionId;
+      activeSessionId = newSessionId;
+    }
+    
+    // Add up to last 10 messages from the active session as conversation history
+    const conversationHistory = activeSession.messages
+      .slice(-10)
+      .map(msg => ({ role: msg.sender === 'user' ? 'user' : 'assistant', content: msg.message }));
+    
     // Get response from LLM
     try {
-      // Use the centralized system prompt
-      botReply = await llmService.getLLMResponse(message, context, MAIN_SYSTEM_PROMPT);
+      // Use the centralized system prompt with conversation history
+      botReply = await llmService.getLLMResponse(message, context, MAIN_SYSTEM_PROMPT, conversationHistory);
       
       // Add source attribution if context was used
       if (sources.length > 0) {
@@ -121,29 +193,30 @@ exports.handleChatMessage = async (req, res) => {
       }
     }
     
-    // Find or create chat history for the user
-    let chatHistory = await ChatHistory.findOne({ userId });
-    
-    if (!chatHistory) {
-      chatHistory = new ChatHistory({ userId, messages: [] });
-    }
-    
     // Add user message to chat history
-    chatHistory.messages.push({
+    activeSession.messages.push({
       sender: 'user',
       message: message,
+      timestamp: new Date()
     });
     
     // Add bot reply to chat history
-    chatHistory.messages.push({
+    activeSession.messages.push({
       sender: 'bot',
       message: botReply,
+      timestamp: new Date()
     });
+    
+    // Update session's lastUpdatedAt
+    activeSession.lastUpdatedAt = new Date();
     
     // Save updated chat history
     await chatHistory.save();
     
-    res.json({ reply: botReply });
+    res.json({ 
+      reply: botReply,
+      sessionId: activeSessionId
+    });
   } catch (error) {
     console.error('Error handling chat message:', error);
     res.status(500).json({ error: 'Failed to process chat message' });
