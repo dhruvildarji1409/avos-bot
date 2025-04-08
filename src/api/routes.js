@@ -37,12 +37,9 @@ router.put('/chat-sessions/rename', authMiddleware, chatController.renameChatSes
 
 // Confluence data routes - protected
 router.post('/confluence', authMiddleware, confluenceController.addConfluenceData);
-router.get('/confluence/search', confluenceController.searchConfluenceData); // Keep public for searching
+router.get('/confluence/search', confluenceController.searchConfluence); // Keep public for searching
 router.post('/confluence/fetch', authMiddleware, confluenceController.fetchAndStoreConfluenceData);
 router.get('/confluence/:id', confluenceController.getConfluenceData); // Keep public for viewing
-
-// Confluence routes
-router.get('/confluence/search', confluenceController.searchConfluence);
 
 // Confluence admin routes (protected)
 router.get('/confluence/admin/pages', authMiddleware, confluenceController.getAllPages);

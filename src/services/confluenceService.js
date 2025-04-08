@@ -421,6 +421,10 @@ class ConfluenceService {
         spaceKey = pathParts[pathParts.indexOf('spaces') + 1];
       }
       
+      if (pathParts.includes('display') && pathParts.length > pathParts.indexOf('display') + 1) {
+        spaceKey = pathParts[pathParts.indexOf('display') + 1];
+      }
+      
       // Extract page sections
       const sections = this.chunkContentByHeaders(page.content, page.id);
       
@@ -460,12 +464,23 @@ class ConfluenceService {
         console.error(`Error generating page embedding: ${err.message}`);
       }
       
-      // Build metadata array
-      const metadata = [
-        { key: 'pageId', value: page.id },
-        { key: 'spaceKey', value: spaceKey },
-        { key: 'lastExtracted', value: new Date().toISOString() }
-      ];
+      // Build metadata array - ensure no empty values
+      const metadata = [];
+      
+      // Only add non-empty values to metadata
+      if (page.id) {
+        metadata.push({ key: 'pageId', value: page.id });
+      }
+      
+      if (spaceKey) {
+        metadata.push({ key: 'spaceKey', value: spaceKey });
+      }
+      
+      // Always add a timestamp
+      metadata.push({ 
+        key: 'lastExtracted', 
+        value: new Date().toISOString() 
+      });
       
       // If page exists, update it
       if (existingPage) {
@@ -511,7 +526,7 @@ class ConfluenceService {
         spaceName,
         metadata,
         formatVersion: 2,
-        tags: ['confluence', spaceKey]
+        tags: ['confluence', spaceKey].filter(Boolean)  // Filter out empty values
       });
       
       if (page.parentId) {
