@@ -16,7 +16,7 @@ config = {
     "username": os.getenv("CONFLUENCE_USERNAME", "ddarji"),
     "password": os.getenv("CONFLUENCE_PASSWORD", "ArPfLkLoQxBbUjHESYdU7rfL8o61Itp07eOoqH"),
     "manifest_path": os.getenv("MANIFEST_PATH", "manifest.txt"),
-    "openai_api_key": os.getenv("OPENAI_API_KEY", "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")
+    "openai_api_key": os.getenv("OPENAI_API_KEY", "")
 }
 
 # Initialize the OpenAI client

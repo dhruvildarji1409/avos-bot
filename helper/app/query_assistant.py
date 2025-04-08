@@ -164,7 +164,7 @@ class QueryAssistant:
 def main():
     # Make sure you set your OpenAI API key in an environment variable
     # openai_api_key = os.getenv("OPENAI_API_KEY", "<YOUR_OPENAI_KEY_HERE>")
-    openai.api_key = "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"
+    openai.api_key = ""
     if not openai.api_key:
         raise ValueError("Please set OPENAI_API_KEY env variable or put it in code.")
 
