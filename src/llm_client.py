@@ -17,6 +17,28 @@ except ImportError:
     print("Warning: Required dependencies not installed. Using simulated responses only.", file=sys.stderr)
     print("To install dependencies: pip install requests openai", file=sys.stderr)
 
+# Read prompts from the JS file
+def get_default_system_prompt():
+    """Read the default system prompt from prompts.js config file."""
+    try:
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        prompts_path = os.path.join(script_dir, "config", "prompts.js")
+        
+        if os.path.exists(prompts_path):
+            with open(prompts_path, 'r') as f:
+                content = f.read()
+                # Simple extraction of the DEFAULT_LLM_PROMPT from the JS file
+                start = content.find('DEFAULT_LLM_PROMPT = `') + len('DEFAULT_LLM_PROMPT = `')
+                end = content.find('`;', start)
+                if start > 0 and end > 0:
+                    return content[start:end]
+        
+        # Fallback prompt if file not found or parsing fails
+        return "You are a helpful AI assistant specialized in AVOS (Autonomous Vehicle Operating System) developed by NVIDIA. Provide accurate and helpful information about AVOS features, capabilities, and usage. If you don't know something, be honest about it. Please give small and precise answers. Don't give out of context answers. Please give answers in bullet points."
+    except Exception as e:
+        print(f"Error loading system prompt: {e}", file=sys.stderr)
+        return "You are a helpful AI assistant specialized in AVOS (Autonomous Vehicle Operating System) developed by NVIDIA. Provide accurate and helpful information about AVOS features, capabilities, and usage. If you don't know something, be honest about it."
+
 def basic_auth(p_client_id, p_client_secret):
     """Create Basic Auth header value."""
     token = base64.b64encode(f"{p_client_id}:{p_client_secret}".encode('utf-8')).decode("ascii")
@@ -95,7 +117,8 @@ def get_azure_client():
 
 def get_simulated_response(prompt, context=""):
     """Provide simulated responses when API is unavailable."""
-    # Simulated knowledge base
+    # The simulated knowledge base now comes from config/prompts.js
+    # This is a simplified version as fallback
     avos_knowledge = {
         'avos': 'AVOS (Autonomous Vehicle Operating System) is NVIDIA\'s comprehensive software stack designed for autonomous vehicles. It provides a flexible, scalable platform that integrates perception, planning, and control systems necessary for self-driving capabilities.',
         'drive': 'NVIDIA DRIVE is a platform that uses AVOS and is designed for developing autonomous vehicles. It includes both hardware (like the DRIVE AGX Orin system-on-a-chip) and software components that work together to enable self-driving capabilities.',
@@ -149,7 +172,7 @@ def get_llm_response(prompt, context="", system_prompt=""):
                 else:
                     messages.append({
                         "role": "system", 
-                        "content": "You are a helpful AI assistant specialized in AVOS (Autonomous Vehicle Operating System) developed by NVIDIA. Provide accurate and helpful information about AVOS features, capabilities, and usage. If you don't know something, be honest about it. Please give small and precise answers. Don't give out of context answers. Please give answers in bullet points."
+                        "content": get_default_system_prompt()
                     })
                 
                 # Add context if provided

@@ -2,6 +2,7 @@ const ChatHistory = require('../models/ChatHistory');
 const ConfluenceData = require('../models/ConfluenceData');
 const llmService = require('../services/llmService');
 const { getEmbedding, computeSimilarity } = require('../services/embeddingService');
+const { MAIN_SYSTEM_PROMPT, FALLBACK_RESPONSES } = require('../config/prompts');
 
 // Handle chat messages
 exports.handleChatMessage = async (req, res) => {
@@ -88,16 +89,8 @@ exports.handleChatMessage = async (req, res) => {
     
     // Get response from LLM
     try {
-      // Create a system prompt with instructions
-      const systemPrompt = `You are AVOS Bot, an AI assistant for NVIDIA's Autonomous Vehicle Operating System (AVOS).
-Your goal is to provide accurate, helpful information about AVOS.
-Use the provided context to answer the user's question accurately.
-Always maintain a professional, helpful tone.
-If the provided context doesn't contain relevant information, acknowledge this and provide general AVOS information if possible.
-If asked about topics unrelated to AVOS, politely redirect the conversation to AVOS-related topics.
-Include source attribution at the end of your response when using provided context.`;
-
-      botReply = await llmService.getLLMResponse(message, context, systemPrompt);
+      // Use the centralized system prompt
+      botReply = await llmService.getLLMResponse(message, context, MAIN_SYSTEM_PROMPT);
       
       // Add source attribution if context was used
       if (sources.length > 0) {
@@ -115,15 +108,16 @@ Include source attribution at the end of your response when using provided conte
     } catch (llmError) {
       console.error('Error getting LLM response:', llmError);
       
-      // Fallback to predefined responses if LLM fails
-      if (message.toLowerCase().includes('avos')) {
-        botReply = 'AVOS is Autonomous Vehicle Operating System, a powerful platform developed by NVIDIA for autonomous vehicles.';
-      } else if (message.toLowerCase().includes('help')) {
-        botReply = 'I can provide information about AVOS, its features, and how to use it. What would you like to know?';
-      } else if (message.toLowerCase().includes('feature')) {
-        botReply = 'AVOS includes features such as sensor fusion, path planning, obstacle detection, and more.';
+      // Fallback to predefined responses if LLM fails using centralized fallback responses
+      const lowerCaseMessage = message.toLowerCase();
+      if (lowerCaseMessage.includes('avos')) {
+        botReply = FALLBACK_RESPONSES.avos;
+      } else if (lowerCaseMessage.includes('help')) {
+        botReply = FALLBACK_RESPONSES.help;
+      } else if (lowerCaseMessage.includes('feature')) {
+        botReply = FALLBACK_RESPONSES.feature;
       } else {
-        botReply = 'I\'m still learning about AVOS. Can you ask something more specific about AVOS?';
+        botReply = FALLBACK_RESPONSES.default;
       }
     }
     

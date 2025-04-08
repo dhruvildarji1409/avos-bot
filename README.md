@@ -12,6 +12,7 @@ AVOS Bot is a chatbot designed to help NVIDIA users get information about AVOS (
 - Chat history storage for each user
 - Enhanced sharing with secure, expirable links
 - Admin panel for AVOS developers to upload new content
+- Centralized prompt system for easy customization and tuning
 
 ## Prerequisites
 
@@ -83,87 +84,23 @@ Start the server in production mode:
 npm start
 ```
 
+### Customizing Bot Responses with Prompt Engineering
+
+The AVOS Bot now features a centralized prompt system that makes it easy to customize and tune the bot's responses without modifying multiple files in the codebase.
+
+All prompts are stored in a single file: `src/config/prompts.js`
+
+To customize the bot's behavior:
+
+1. Edit the prompts in this file according to your needs
+2. Restart the server to apply changes
+3. Test with different queries to see the effects
+
+For detailed information about available prompts and best practices for customization, see the [Prompt Engineering Guide](docs/prompt-engineering.md).
+
 ### Generating Embeddings
 
 To generate embeddings for existing content in the database:
 ```
 npm run generate-embeddings
 ```
-
-### Accessing the Chat Interface
-
-Open your browser and navigate to:
-```
-http://localhost:3000
-```
-
-### Accessing the Admin Panel
-
-Open your browser and navigate to:
-```
-http://localhost:3000/admin.html
-```
-
-### Adding Confluence Content
-
-1. Go to the Admin Panel.
-2. Enter a Confluence URL and your name in the form.
-3. Click "Fetch and Add Content" to automatically fetch and add the content.
-4. The system will also fetch and add all child pages.
-5. Embeddings will be automatically generated for the content.
-6. Alternatively, you can manually add content using the second form.
-
-### Sharing Chat History
-
-1. In the chat interface, click the "Share" button in the bottom right.
-2. A secure share link will be generated with an expiration date (default: 24 hours).
-3. Copy the link and share it with others.
-4. When someone opens the share link, they will see your chat history.
-
-## API Endpoints
-
-### Chat
-- **POST /api/chat**: Send a message to the chatbot
-
-### Chat History
-- **POST /api/chat-history**: Create a new chat history
-- **GET /api/chat-history/:userId**: Retrieve chat history by user ID
-- **DELETE /api/chat-history/:userId**: Delete a chat history
-
-### Enhanced Sharing
-- **POST /api/chat-history/share**: Share chat history with another user
-- **GET /api/chat-history/shared/:userId**: Get chat histories shared with a user
-- **POST /api/chat-history/:userId/share**: Generate a shareable link
-- **GET /api/chat-history/token/:token**: Get chat history by share token
-
-### Confluence
-- **POST /api/confluence**: Add new Confluence content
-- **GET /api/confluence/search**: Search Confluence content
-- **POST /api/confluence/fetch**: Fetch and store Confluence content
-
-## How It Works
-
-### Semantic Search
-
-The bot uses embeddings-based semantic search to find the most relevant content:
-
-1. When a user asks a question, the query is converted into an embedding vector.
-2. This vector is compared with embeddings of stored Confluence content.
-3. The most semantically similar content is retrieved and used as context.
-4. The LLM generates a response based on this relevant context.
-
-This approach provides more accurate responses than simple keyword matching.
-
-### Embedding Generation
-
-Embeddings are generated using:
-1. Local SentenceTransformer model (works offline)
-2. Falls back to Azure OpenAI's embedding API when needed
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## License
-
-This project is licensed under the ISC License.
