@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AVOS Bot - Confluence Admin</title>
+  <link rel="stylesheet" href="styles.css">
+  <style>
+    .admin-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+    .admin-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .admin-card {
+      background-color: #ffffff;
+      border-radius: 8px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+    .stats-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 15px;
+      margin-bottom: 20px;
+    }
+    .stat-card {
+      background-color: #f7f9fc;
+      border-radius: 8px;
+      padding: 15px;
+      text-align: center;
+    }
+    .stat-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #333;
+      margin: 10px 0;
+    }
+    .stat-label {
+      font-size: 14px;
+      color: #666;
+    }
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+    }
+    .form-group {
+      margin-bottom: 15px;
+    }
+    .form-group label {
+      display: block;
+      margin-bottom: 5px;
+      font-weight: 500;
+    }
+    .form-control {
+      width: 100%;
+      padding: 10px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    .table-responsive {
+      overflow-x: auto;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+    table th, table td {
+      padding: 12px;
+      text-align: left;
+      border-bottom: 1px solid #eee;
+    }
+    table th {
+      background-color: #f7f9fc;
+      font-weight: 600;
+      color: #333;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 4px;
+      font-size: 12px;
+      font-weight: 500;
+    }
+    .status-v1 {
+      background-color: #ffecb3;
+      color: #856404;
+    }
+    .status-v2 {
+      background-color: #d4edda;
+      color: #155724;
+    }
+    .btn-group {
+      display: flex;
+      gap: 5px;
+    }
+    .tab-container {
+      margin-bottom: 20px;
+    }
+    .tab-navigation {
+      display: flex;
+      border-bottom: 1px solid #ddd;
+      margin-bottom: 20px;
+    }
+    .tab-link {
+      padding: 10px 20px;
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+    }
+    .tab-link.active {
+      font-weight: bold;
+      border-bottom-color: #76b900;
+    }
+    .tab-content {
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+    .pagination {
+      display: flex;
+      justify-content: center;
+      margin-top: 20px;
+    }
+    .pagination button {
+      margin: 0 5px;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">
+      <h1>AVOS Bot</h1>
+    </div>
+    <nav>
+      <ul>
+        <li><a href="index.html">Home</a></li>
+        <li><a href="confluence-admin.html" class="active">Confluence Admin</a></li>
+        <li><a href="#" id="logout-btn">Logout</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <div class="admin-container">
+    <div class="admin-header">
+      <h1>Confluence Content Management</h1>
+      <div>
+        <button class="button primary" id="refresh-stats-btn">Refresh Stats</button>
+      </div>
+    </div>
+
+    <div class="tab-container">
+      <div class="tab-navigation">
+        <div class="tab-link active" data-tab="dashboard">Dashboard</div>
+        <div class="tab-link" data-tab="add-content">Add Content</div>
+        <div class="tab-link" data-tab="manage-content">Manage Content</div>
+      </div>
+
+      <!-- Dashboard Tab -->
+      <div class="tab-content active" id="dashboard">
+        <div class="admin-card">
+          <h2>Confluence Data Overview</h2>
+          <div class="stats-container" id="stats-container">
+            <div class="stat-card">
+              <div class="stat-label">Total Pages</div>
+              <div class="stat-value" id="total-pages">-</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Spaces</div>
+              <div class="stat-value" id="total-spaces">-</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Format v1</div>
+              <div class="stat-value" id="format-v1">-</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-label">Format v2</div>
+              <div class="stat-value" id="format-v2">-</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="admin-card">
+          <h2>Recent Pages</h2>
+          <div class="table-responsive">
+            <table id="recent-pages">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Added By</th>
+                  <th>Date Added</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Dynamic content -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="admin-card">
+          <h2>Space Distribution</h2>
+          <div class="table-responsive">
+            <table id="space-distribution">
+              <thead>
+                <tr>
+                  <th>Space Key</th>
+                  <th>Page Count</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Dynamic content -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Add Content Tab -->
+      <div class="tab-content" id="add-content">
+        <div class="admin-card">
+          <h2>Add Confluence Page</h2>
+          <form id="add-page-form">
+            <div class="form-group">
+              <label for="page-url">Confluence Page URL</label>
+              <input type="text" id="page-url" class="form-control" placeholder="https://confluence.nvidia.com/display/SPACE/Page+Title" required>
+            </div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="process-children">Process Child Pages</label>
+                <select id="process-children" class="form-control">
+                  <option value="true">Yes</option>
+                  <option value="false">No</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label for="max-depth">Maximum Depth</label>
+                <select id="max-depth" class="form-control">
+                  <option value="0">0 - Current page only</option>
+                  <option value="1" selected>1 - Direct children</option>
+                  <option value="2">2 - Children and grandchildren</option>
+                  <option value="3">3 - Deep crawl (use carefully)</option>
+                </select>
+              </div>
+            </div>
+            <button type="submit" class="button primary">Add Page</button>
+          </form>
+        </div>
+
+        <div class="admin-card">
+          <h2>Process Confluence Space</h2>
+          <form id="process-space-form">
+            <div class="form-group">
+              <label for="space-key">Space Key</label>
+              <input type="text" id="space-key" class="form-control" placeholder="e.g., DSW, AVOS, DEV" required>
+            </div>
+            <div class="form-group">
+              <label for="space-max-depth">Maximum Depth</label>
+              <select id="space-max-depth" class="form-control">
+                <option value="0">0 - Space home page only</option>
+                <option value="1" selected>1 - Direct children of home page</option>
+                <option value="2">2 - Two levels deep (use carefully)</option>
+              </select>
+            </div>
+            <button type="submit" class="button primary">Process Space</button>
+          </form>
+        </div>
+      </div>
+
+      <!-- Manage Content Tab -->
+      <div class="tab-content" id="manage-content">
+        <div class="admin-card">
+          <h2>Manage Confluence Pages</h2>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="sort-by">Sort By</label>
+              <select id="sort-by" class="form-control">
+                <option value="addedAt">Date Added</option>
+                <option value="title">Title</option>
+                <option value="spaceKey">Space Key</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="sort-order">Order</label>
+              <select id="sort-order" class="form-control">
+                <option value="desc">Descending</option>
+                <option value="asc">Ascending</option>
+              </select>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table id="pages-table">
+              <thead>
+                <tr>
+                  <th>Title</th>
+                  <th>Space</th>
+                  <th>Added By</th>
+                  <th>Format</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                <!-- Dynamic content -->
+              </tbody>
+            </table>
+          </div>
+          <div class="pagination" id="pagination">
+            <!-- Dynamic content -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="spinner" class="spinner" style="display:none;">
+    <div class="spinner-content">
+      <div class="spinner-border"></div>
+      <p>Processing...</p>
+    </div>
+  </div>
+
+  <script>
+    // Helper functions
+    function showSpinner() {
+      document.getElementById('spinner').style.display = 'flex';
+    }
+
+    function hideSpinner() {
+      document.getElementById('spinner').style.display = 'none';
+    }
+
+    function showToast(message, type = 'success') {
+      // Implementation depends on your toast library
+      alert(message);
+    }
+
+    // Auth check
+    function checkAuth() {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        window.location.href = 'login.html';
+      }
+      return token;
+    }
+
+    // Tab functionality
+    function setupTabs() {
+      const tabLinks = document.querySelectorAll('.tab-link');
+      const tabContents = document.querySelectorAll('.tab-content');
+
+      tabLinks.forEach(link => {
+        link.addEventListener('click', () => {
+          const tabId = link.getAttribute('data-tab');
+          
+          // Remove active class from all links and contents
+          tabLinks.forEach(l => l.classList.remove('active'));
+          tabContents.forEach(c => c.classList.remove('active'));
+          
+          // Add active class to current link and content
+          link.classList.add('active');
+          document.getElementById(tabId).classList.add('active');
+        });
+      });
+    }
+
+    // Load dashboard stats
+    async function loadStats() {
+      const token = checkAuth();
+      showSpinner();
+      
+      try {
+        const response = await fetch('/api/confluence/admin/stats', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          // Update stats
+          document.getElementById('total-pages').textContent = data.stats.totalPages;
+          document.getElementById('total-spaces').textContent = data.stats.bySpace.length;
+          
+          // Find format version counts
+          const formatV1 = data.stats.byVersion.find(v => v._id === 1);
+          const formatV2 = data.stats.byVersion.find(v => v._id === 2);
+          
+          document.getElementById('format-v1').textContent = formatV1 ? formatV1.count : 0;
+          document.getElementById('format-v2').textContent = formatV2 ? formatV2.count : 0;
+          
+          // Update recent pages table
+          const recentPagesTable = document.getElementById('recent-pages').querySelector('tbody');
+          recentPagesTable.innerHTML = '';
+          
+          data.stats.latestPages.forEach(page => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td>${page.title}</td>
+              <td>${page.addedBy}</td>
+              <td>${new Date(page.addedAt).toLocaleString()}</td>
+              <td>
+                <div class="btn-group">
+                  <button class="button small view-btn" data-id="${page._id}">View</button>
+                  <button class="button small secondary refresh-btn" data-id="${page._id}">Refresh</button>
+                </div>
+              </td>
+            `;
+            recentPagesTable.appendChild(row);
+          });
+          
+          // Update space distribution table
+          const spaceTable = document.getElementById('space-distribution').querySelector('tbody');
+          spaceTable.innerHTML = '';
+          
+          data.stats.bySpace.forEach(space => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td>${space._id || 'Unknown'}</td>
+              <td>${space.count}</td>
+            `;
+            spaceTable.appendChild(row);
+          });
+        } else {
+          showToast(data.message, 'error');
+        }
+      } catch (error) {
+        console.error('Error loading stats:', error);
+        showToast('Failed to load stats', 'error');
+      } finally {
+        hideSpinner();
+      }
+    }
+
+    // Load pages for management
+    let currentPage = 1;
+    let totalPages = 1;
+    
+    async function loadPages(page = 1, sortBy = 'addedAt', order = 'desc') {
+      const token = checkAuth();
+      showSpinner();
+      
+      try {
+        const response = await fetch(`/api/confluence/admin/pages?page=${page}&limit=10&sortBy=${sortBy}&order=${order}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        const data = await response.json();
+        
+        if (data.success) {
+          currentPage = data.currentPage;
+          totalPages = data.totalPages;
+          
+          // Update table
+          const pagesTable = document.getElementById('pages-table').querySelector('tbody');
+          pagesTable.innerHTML = '';
+          
+          data.pages.forEach(page => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+              <td>${page.title}</td>
+              <td>${page.spaceKey || 'Unknown'}</td>
+              <td>${page.addedBy}</td>
+              <td><span class="status-badge ${page.formatVersion === 2 ? 'status-v2' : 'status-v1'}">v${page.formatVersion || 1}</span></td>
+              <td>
+                <div class="btn-group">
+                  <button class="button small view-btn" data-id="${page._id}">View</button>
+                  <button class="button small secondary refresh-btn" data-id="${page._id}">Refresh</button>
+                  <button class="button small danger delete-btn" data-id="${page._id}">Delete</button>
+                </div>
+              </td>
+            `;
+            pagesTable.appendChild(row);
+          });
+          
+          // Update pagination
+          updatePagination();
+        } else {
+          showToast(data.message, 'error');
+        }
+      } catch (error) {
+        console.error('Error loading pages:', error);
+        showToast('Failed to load pages', 'error');
+      } finally {
+        hideSpinner();
+      }
+    }
+
+    // Update pagination controls
+    function updatePagination() {
+      const pagination = document.getElementById('pagination');
+      pagination.innerHTML = '';
+      
+      // Previous button
+      const prevBtn = document.createElement('button');
+      prevBtn.classList.add('button', 'small');
+      prevBtn.textContent = 'Previous';
+      prevBtn.disabled = currentPage === 1;
+      prevBtn.addEventListener('click', () => {
+        if (currentPage > 1) {
+          loadPages(currentPage - 1, 
+            document.getElementById('sort-by').value,
+            document.getElementById('sort-order').value
+          );
+        }
+      });
+      pagination.appendChild(prevBtn);
+      
+      // Page indicator
+      const pageIndicator = document.createElement('span');
+      pageIndicator.textContent = `Page ${currentPage} of ${totalPages}`;
+      pageIndicator.style.margin = '0 10px';
+      pagination.appendChild(pageIndicator);
+      
+      // Next button
+      const nextBtn = document.createElement('button');
+      nextBtn.classList.add('button', 'small');
+      nextBtn.textContent = 'Next';
+      nextBtn.disabled = currentPage === totalPages;
+      nextBtn.addEventListener('click', () => {
+        if (currentPage < totalPages) {
+          loadPages(currentPage + 1,
+            document.getElementById('sort-by').value,
+            document.getElementById('sort-order').value
+          );
+        }
+      });
+      pagination.appendChild(nextBtn);
+    }
+
+    // Add page submission
+    function setupAddPageForm() {
+      const form = document.getElementById('add-page-form');
+      
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const token = checkAuth();
+        showSpinner();
+        
+        try {
+          const url = document.getElementById('page-url').value;
+          const processChildren = document.getElementById('process-children').value;
+          const maxDepth = document.getElementById('max-depth').value;
+          
+          const response = await fetch('/api/confluence/admin/pages', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              url,
+              processChildren,
+              maxDepth
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            showToast('Page added successfully');
+            form.reset();
+            // Reload stats
+            loadStats();
+          } else {
+            showToast(data.message, 'error');
+          }
+        } catch (error) {
+          console.error('Error adding page:', error);
+          showToast('Failed to add page', 'error');
+        } finally {
+          hideSpinner();
+        }
+      });
+    }
+
+    // Process space submission
+    function setupProcessSpaceForm() {
+      const form = document.getElementById('process-space-form');
+      
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const token = checkAuth();
+        showSpinner();
+        
+        try {
+          const spaceKey = document.getElementById('space-key').value;
+          const maxDepth = document.getElementById('space-max-depth').value;
+          
+          const response = await fetch('/api/confluence/admin/spaces', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              spaceKey,
+              maxDepth
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            showToast(data.message);
+            form.reset();
+            // Reload stats
+            loadStats();
+          } else {
+            showToast(data.message, 'error');
+          }
+        } catch (error) {
+          console.error('Error processing space:', error);
+          showToast('Failed to process space', 'error');
+        } finally {
+          hideSpinner();
+        }
+      });
+    }
+
+    // Logout handler
+    function setupLogout() {
+      const logoutBtn = document.getElementById('logout-btn');
+      
+      logoutBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        localStorage.removeItem('token');
+        localStorage.removeItem('username');
+        window.location.href = 'login.html';
+      });
+    }
+
+    // Setup event listeners for sorting
+    function setupSorting() {
+      const sortBy = document.getElementById('sort-by');
+      const sortOrder = document.getElementById('sort-order');
+      
+      function handleSortChange() {
+        loadPages(1, sortBy.value, sortOrder.value);
+      }
+      
+      sortBy.addEventListener('change', handleSortChange);
+      sortOrder.addEventListener('change', handleSortChange);
+    }
+
+    // Setup event delegation for table actions
+    function setupTableActions() {
+      document.addEventListener('click', async (e) => {
+        const token = checkAuth();
+        
+        // View button
+        if (e.target.classList.contains('view-btn')) {
+          const id = e.target.getAttribute('data-id');
+          window.open(`/index.html?doc=${id}`, '_blank');
+        }
+        
+        // Refresh button
+        if (e.target.classList.contains('refresh-btn')) {
+          const id = e.target.getAttribute('data-id');
+          showSpinner();
+          
+          try {
+            const response = await fetch(`/api/confluence/admin/pages/${id}/refresh`, {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json'
+              }
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+              showToast('Page refreshed successfully');
+              // Reload current view
+              if (document.querySelector('.tab-link.active').getAttribute('data-tab') === 'dashboard') {
+                loadStats();
+              } else {
+                loadPages(currentPage, 
+                  document.getElementById('sort-by').value,
+                  document.getElementById('sort-order').value
+                );
+              }
+            } else {
+              showToast(data.message, 'error');
+            }
+          } catch (error) {
+            console.error('Error refreshing page:', error);
+            showToast('Failed to refresh page', 'error');
+          } finally {
+            hideSpinner();
+          }
+        }
+        
+        // Delete button
+        if (e.target.classList.contains('delete-btn')) {
+          const id = e.target.getAttribute('data-id');
+          if (confirm('Are you sure you want to delete this page? This action cannot be undone.')) {
+            showSpinner();
+            
+            try {
+              const response = await fetch(`/api/confluence/admin/pages/${id}`, {
+                method: 'DELETE',
+                headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+                }
+              });
+              
+              const data = await response.json();
+              
+              if (data.success) {
+                showToast('Page deleted successfully');
+                // Reload current view
+                if (document.querySelector('.tab-link.active').getAttribute('data-tab') === 'dashboard') {
+                  loadStats();
+                } else {
+                  loadPages(currentPage, 
+                    document.getElementById('sort-by').value,
+                    document.getElementById('sort-order').value
+                  );
+                }
+              } else {
+                showToast(data.message, 'error');
+              }
+            } catch (error) {
+              console.error('Error deleting page:', error);
+              showToast('Failed to delete page', 'error');
+            } finally {
+              hideSpinner();
+            }
+          }
+        }
+      });
+      
+      // Refresh stats button
+      document.getElementById('refresh-stats-btn').addEventListener('click', loadStats);
+    }
+
+    // Initialize
+    document.addEventListener('DOMContentLoaded', () => {
+      checkAuth();
+      setupTabs();
+      loadStats();
+      loadPages();
+      setupAddPageForm();
+      setupProcessSpaceForm();
+      setupSorting();
+      setupTableActions();
+      setupLogout();
+    });
+  </script>
+</body>
+</html> 
