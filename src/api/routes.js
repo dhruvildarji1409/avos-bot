@@ -42,8 +42,6 @@ router.post('/confluence/fetch', authMiddleware, confluenceController.fetchAndSt
 router.get('/confluence/:id', confluenceController.getConfluenceData); // Keep public for viewing
 
 // Confluence routes
-router.get('/confluence/url-info', confluenceController.getUrlInfo);
-router.get('/confluence/content', confluenceController.getContent);
 router.get('/confluence/search', confluenceController.searchConfluence);
 
 // Confluence admin routes (protected)
