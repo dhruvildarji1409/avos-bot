@@ -41,4 +41,18 @@ router.get('/confluence/search', confluenceController.searchConfluenceData); // 
 router.post('/confluence/fetch', authMiddleware, confluenceController.fetchAndStoreConfluenceData);
 router.get('/confluence/:id', confluenceController.getConfluenceData); // Keep public for viewing
 
+// Confluence routes
+router.get('/confluence/url-info', confluenceController.getUrlInfo);
+router.get('/confluence/content', confluenceController.getContent);
+router.get('/confluence/search', confluenceController.searchConfluence);
+
+// Confluence admin routes (protected)
+router.get('/confluence/admin/pages', authMiddleware, confluenceController.getAllPages);
+router.get('/confluence/admin/pages/:id', authMiddleware, confluenceController.getPageDetails);
+router.post('/confluence/admin/pages', authMiddleware, confluenceController.addPageByUrl);
+router.post('/confluence/admin/spaces', authMiddleware, confluenceController.processSpace);
+router.delete('/confluence/admin/pages/:id', authMiddleware, confluenceController.deletePage);
+router.get('/confluence/admin/stats', authMiddleware, confluenceController.getStats);
+router.post('/confluence/admin/pages/:id/refresh', authMiddleware, confluenceController.refreshPage);
+
 module.exports = router; 

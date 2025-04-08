@@ -2,8 +2,10 @@ const mongoose = require('mongoose');
 const axios = require('axios');
 require('dotenv').config();
 
-// Import the ConfluenceData model
+// Import the ConfluenceData model and services
 const ConfluenceData = require('../models/ConfluenceData');
+const ConfluenceService = require('../services/confluenceService');
+const { getEmbedding } = require('../services/embeddingService');
 
 // Confluence API configuration
 const confluenceConfig = {
@@ -12,104 +14,118 @@ const confluenceConfig = {
   apiToken: process.env.CONFLUENCE_API_TOKEN
 };
 
-// Basic auth for Confluence API
-const auth = {
-  username: confluenceConfig.username,
-  password: confluenceConfig.apiToken
-};
+// Create Confluence service instance
+const confluenceService = new ConfluenceService(
+  confluenceConfig.baseUrl,
+  confluenceConfig.username,
+  confluenceConfig.apiToken
+);
 
-// Function to fetch a Confluence page by URL
-async function fetchConfluencePage(pageUrl) {
+// Function to extract and store a Confluence page with all related data
+async function processConfluencePage(pageUrl, options = {}) {
   try {
-    // Extract page ID from URL
-    const pageId = pageUrl.split('pageId=')[1] || 
-                  pageUrl.split('pages/')[1]?.split('/')[0] || 
-                  pageUrl.split('title=')[1];
+    console.log(`Processing Confluence page: ${pageUrl}`);
     
-    if (!pageId) {
-      console.error('Could not extract page ID from URL:', pageUrl);
+    // Use the enhanced method for structured processing
+    const page = await confluenceService.processPageStructured(pageUrl, {
+      extractSections: true,
+      maxDepth: options.maxDepth || 2,
+      processChildren: options.processChildren || true,
+      includeMetadata: true
+    });
+    
+    if (!page) {
+      console.error(`Failed to process page: ${pageUrl}`);
       return null;
     }
-
-    console.log(`Fetching page with ID: ${pageId}`);
     
-    // Get page content
-    const response = await axios.get(
-      `${confluenceConfig.baseUrl}/rest/api/content/${pageId}?expand=body.storage,children.page`,
-      { auth }
+    // Store the page with embeddings
+    const storedPage = await confluenceService.storePageWithEmbeddings(
+      ConfluenceData,
+      page,
+      options.addedBy || 'System'
     );
-
-    const page = response.data;
     
-    return {
-      title: page.title,
-      content: page.body.storage.value,
-      url: pageUrl,
-      pageId: page.id,
-      children: page.children?.page?.results || []
-    };
-  } catch (error) {
-    console.error('Error fetching Confluence page:', error.message);
-    return null;
-  }
-}
-
-// Function to store a page in the database
-async function storePage(page, addedBy = 'System') {
-  try {
-    // Check if the page already exists
-    const existingPage = await ConfluenceData.findOne({ url: page.url });
+    console.log(`Successfully stored page: ${page.title}`);
     
-    if (existingPage) {
-      console.log(`Page "${page.title}" already exists in the database. Updating...`);
-      existingPage.title = page.title;
-      existingPage.content = page.content;
-      await existingPage.save();
-      return existingPage;
-    } else {
-      console.log(`Storing page "${page.title}" in the database...`);
-      const newPage = new ConfluenceData({
-        title: page.title,
-        content: page.content,
-        url: page.url,
-        addedBy,
-        tags: ['AVOS', 'CI', 'Jenkins']
-      });
+    // Process children if available
+    if (page.processedChildren && page.processedChildren.length > 0) {
+      console.log(`Processing ${page.processedChildren.length} child pages for: ${page.title}`);
       
-      await newPage.save();
-      return newPage;
+      for (const childPage of page.processedChildren) {
+        // Store each child page
+        await confluenceService.storePageWithEmbeddings(
+          ConfluenceData,
+          childPage,
+          options.addedBy || 'System'
+        );
+      }
     }
+    
+    return storedPage;
   } catch (error) {
-    console.error('Error storing page in database:', error);
+    console.error(`Error processing Confluence page: ${error.message}`);
     return null;
   }
 }
 
-// Function to recursively fetch and store pages
-async function fetchAndStoreRecursively(pageUrl, depth = 0, maxDepth = 2) {
-  if (depth > maxDepth) {
-    console.log(`Maximum depth (${maxDepth}) reached. Stopping recursion.`);
-    return;
-  }
-  
-  console.log(`Fetching page at depth ${depth}: ${pageUrl}`);
-  const page = await fetchConfluencePage(pageUrl);
-  
-  if (!page) {
-    console.log(`Could not fetch page: ${pageUrl}`);
-    return;
-  }
-  
-  await storePage(page);
-  
-  // Process child pages
-  if (page.children && page.children.length > 0) {
-    console.log(`Found ${page.children.length} child pages for "${page.title}"`);
+// Function to process a space or collection of pages
+async function processConfluenceSpace(spaceKey, options = {}) {
+  try {
+    console.log(`Processing Confluence space: ${spaceKey}`);
     
-    for (const child of page.children) {
-      const childUrl = `${confluenceConfig.baseUrl}/pages/viewpage.action?pageId=${child.id}`;
-      await fetchAndStoreRecursively(childUrl, depth + 1, maxDepth);
+    // Get space information
+    const response = await axios.get(
+      `${confluenceConfig.baseUrl}/rest/api/space/${spaceKey}?expand=description.plain`,
+      {
+        auth: {
+          username: confluenceConfig.username,
+          password: confluenceConfig.apiToken
+        }
+      }
+    );
+    
+    if (!response.data) {
+      throw new Error(`Could not fetch space: ${spaceKey}`);
     }
+    
+    const space = response.data;
+    console.log(`Processing space: ${space.name} (${space.key})`);
+    
+    // Get space homepage
+    if (space.homepage) {
+      const homepageUrl = `${confluenceConfig.baseUrl}/pages/viewpage.action?pageId=${space.homepage.id}`;
+      await processConfluencePage(homepageUrl, {
+        ...options,
+        maxDepth: 1 // Limit depth for space homepage
+      });
+    }
+    
+    // Get popular pages in the space
+    const pagesResponse = await axios.get(
+      `${confluenceConfig.baseUrl}/rest/api/content?spaceKey=${spaceKey}&expand=version&limit=50`,
+      {
+        auth: {
+          username: confluenceConfig.username,
+          password: confluenceConfig.apiToken
+        }
+      }
+    );
+    
+    if (pagesResponse.data && pagesResponse.data.results) {
+      const pages = pagesResponse.data.results;
+      console.log(`Found ${pages.length} pages in space ${spaceKey}`);
+      
+      for (const page of pages) {
+        const pageUrl = `${confluenceConfig.baseUrl}/pages/viewpage.action?pageId=${page.id}`;
+        await processConfluencePage(pageUrl, options);
+      }
+    }
+    
+    return true;
+  } catch (error) {
+    console.error(`Error processing Confluence space: ${error.message}`);
+    return false;
   }
 }
 
@@ -123,13 +139,36 @@ async function main() {
     });
     console.log('Connected to MongoDB');
     
-    // The target Confluence page
-    const targetUrl = 'https://confluence.nvidia.com/pages/viewpage.action?spaceKey=DSW&title=AVOS+CI+-+End-to-End+Jenkins+Pipeline';
+    // Process specific pages
+    const targetPages = [
+      // Add important Confluence pages here
+      'https://confluence.nvidia.com/display/DSW/AVOS+CI+-+End-to-End+Jenkins+Pipeline',
+      'https://confluence.nvidia.com/display/DSW/HOW+TO%3A+Generate+Hyp8.1+DDU+image+locally'
+    ];
     
-    // Fetch and store the page and its children
-    await fetchAndStoreRecursively(targetUrl);
+    for (const pageUrl of targetPages) {
+      await processConfluencePage(pageUrl, {
+        maxDepth: 2,
+        processChildren: true,
+        addedBy: 'System'
+      });
+    }
     
-    console.log('Finished processing Confluence pages');
+    // Process specific spaces
+    const targetSpaces = [
+      // Add important Confluence spaces here
+      'DSW'
+    ];
+    
+    for (const spaceKey of targetSpaces) {
+      await processConfluenceSpace(spaceKey, {
+        maxDepth: 1,
+        processChildren: true,
+        addedBy: 'System'
+      });
+    }
+    
+    console.log('Finished processing Confluence content');
     
     // Disconnect from MongoDB
     await mongoose.disconnect();
@@ -139,5 +178,13 @@ async function main() {
   }
 }
 
-// Run the script
-main(); 
+// If this file is run directly, execute the main function
+if (require.main === module) {
+  main();
+}
+
+// Export functions for use in other scripts
+module.exports = {
+  processConfluencePage,
+  processConfluenceSpace
+}; 

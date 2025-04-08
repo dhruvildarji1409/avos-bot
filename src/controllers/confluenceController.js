@@ -2,6 +2,8 @@ const ConfluenceData = require('../models/ConfluenceData');
 const ConfluenceService = require('../services/confluenceService');
 const { getEmbedding, cleanTextForEmbedding } = require('../services/embeddingService');
 const cheerio = require('cheerio');
+const axios = require('axios');
+const { processConfluencePage, processConfluenceSpace } = require('../db/seed-confluence');
 
 // Initialize Confluence Service with credentials from environment variables
 const confluenceService = new ConfluenceService(
@@ -281,5 +283,325 @@ exports.getConfluenceData = async (req, res) => {
   } catch (error) {
     console.error('Error getting Confluence data:', error);
     res.status(500).json({ error: 'Failed to get Confluence data' });
+  }
+};
+
+/**
+ * Search Confluence data in the database
+ */
+exports.searchConfluence = async (req, res) => {
+  try {
+    const { query } = req.query;
+
+    if (!query) {
+      return res.status(400).json({ success: false, message: 'Search query is required' });
+    }
+
+    // Perform text search
+    const textResults = await ConfluenceData.find(
+      { $text: { $search: query } },
+      { score: { $meta: 'textScore' } }
+    ).sort({ score: { $meta: 'textScore' } }).limit(5);
+
+    // If we have enough text results, return them
+    if (textResults.length >= 3) {
+      return res.json({
+        success: true,
+        results: textResults.map(doc => ({
+          id: doc._id,
+          title: doc.title,
+          url: doc.url,
+          content: doc.content.substring(0, 300) + '...',
+          score: doc._score
+        }))
+      });
+    }
+
+    // If text search didn't yield good results, try semantic search
+    const embedding = await getEmbedding(query);
+
+    // Query for vector similarity
+    const pipeline = [
+      {
+        $search: {
+          index: 'vector_index',
+          knnBeta: {
+            vector: embedding,
+            path: 'embedding',
+            k: 5
+          }
+        }
+      },
+      {
+        $project: {
+          title: 1,
+          url: 1,
+          content: 1,
+          score: { $meta: 'searchScore' }
+        }
+      }
+    ];
+
+    const semanticResults = await ConfluenceData.aggregate(pipeline);
+
+    // Combine results
+    const combinedResults = [...textResults, ...semanticResults];
+    const uniqueResults = Array.from(new Map(combinedResults.map(item => [item._id, item])).values());
+
+    res.json({
+      success: true,
+      results: uniqueResults.map(doc => ({
+        id: doc._id,
+        title: doc.title,
+        url: doc.url,
+        content: doc.content.substring(0, 300) + '...',
+        score: doc.score
+      }))
+    });
+  } catch (error) {
+    console.error('Error searching Confluence:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Get all Confluence pages stored in the database
+ */
+exports.getAllPages = async (req, res) => {
+  try {
+    const { page = 1, limit = 10, sortBy = 'addedAt', order = 'desc' } = req.query;
+    
+    // Build sort options
+    const sortOptions = {};
+    sortOptions[sortBy] = order === 'desc' ? -1 : 1;
+    
+    // Count total documents
+    const total = await ConfluenceData.countDocuments();
+    
+    // Get pages with pagination
+    const pages = await ConfluenceData.find()
+      .sort(sortOptions)
+      .limit(parseInt(limit))
+      .skip((parseInt(page) - 1) * parseInt(limit))
+      .select('title url addedAt addedBy pageId spaceKey formatVersion');
+    
+    res.json({
+      success: true,
+      currentPage: parseInt(page),
+      totalPages: Math.ceil(total / parseInt(limit)),
+      totalItems: total,
+      pages
+    });
+  } catch (error) {
+    console.error('Error getting Confluence pages:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Get details of a specific Confluence page
+ */
+exports.getPageDetails = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const page = await ConfluenceData.findById(id);
+    
+    if (!page) {
+      return res.status(404).json({ success: false, message: 'Page not found' });
+    }
+    
+    res.json({
+      success: true,
+      page
+    });
+  } catch (error) {
+    console.error('Error getting page details:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Add a new Confluence page by URL
+ */
+exports.addPageByUrl = async (req, res) => {
+  try {
+    const { url, processChildren = true, maxDepth = 2 } = req.body;
+    const { username } = req.user;
+    
+    if (!url) {
+      return res.status(400).json({ success: false, message: 'URL is required' });
+    }
+    
+    // Process the page and its children
+    const result = await processConfluencePage(url, {
+      maxDepth: parseInt(maxDepth),
+      processChildren: processChildren === 'true' || processChildren === true,
+      addedBy: username
+    });
+    
+    if (!result) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Failed to process the page. Check the URL and try again.' 
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Page added successfully',
+      page: {
+        id: result._id,
+        title: result.title,
+        url: result.url
+      }
+    });
+  } catch (error) {
+    console.error('Error adding page by URL:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Process a Confluence space
+ */
+exports.processSpace = async (req, res) => {
+  try {
+    const { spaceKey, maxDepth = 1 } = req.body;
+    const { username } = req.user;
+    
+    if (!spaceKey) {
+      return res.status(400).json({ success: false, message: 'Space key is required' });
+    }
+    
+    // Process the space
+    const result = await processConfluenceSpace(spaceKey, {
+      maxDepth: parseInt(maxDepth),
+      processChildren: true,
+      addedBy: username
+    });
+    
+    if (!result) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Failed to process the space. Check the space key and try again.' 
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: `Space ${spaceKey} processed successfully`
+    });
+  } catch (error) {
+    console.error('Error processing space:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Delete a Confluence page
+ */
+exports.deletePage = async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await ConfluenceData.findByIdAndDelete(id);
+    
+    if (!result) {
+      return res.status(404).json({ success: false, message: 'Page not found' });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Page deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting page:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Get stats about Confluence data
+ */
+exports.getStats = async (req, res) => {
+  try {
+    const totalPages = await ConfluenceData.countDocuments();
+    
+    // Count by space
+    const spaceStats = await ConfluenceData.aggregate([
+      { $group: { _id: '$spaceKey', count: { $sum: 1 } } },
+      { $sort: { count: -1 } },
+      { $limit: 10 }
+    ]);
+    
+    // Count by format version
+    const versionStats = await ConfluenceData.aggregate([
+      { $group: { _id: '$formatVersion', count: { $sum: 1 } } },
+      { $sort: { _id: 1 } }
+    ]);
+    
+    // Get latest pages
+    const latestPages = await ConfluenceData.find()
+      .sort({ addedAt: -1 })
+      .limit(5)
+      .select('title url addedAt addedBy');
+    
+    res.json({
+      success: true,
+      stats: {
+        totalPages,
+        bySpace: spaceStats,
+        byVersion: versionStats,
+        latestPages
+      }
+    });
+  } catch (error) {
+    console.error('Error getting stats:', error);
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+/**
+ * Refresh a page and update its content
+ */
+exports.refreshPage = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { username } = req.user;
+    
+    const page = await ConfluenceData.findById(id);
+    
+    if (!page) {
+      return res.status(404).json({ success: false, message: 'Page not found' });
+    }
+    
+    // Process the page and update it
+    const result = await processConfluencePage(page.url, {
+      maxDepth: 0, // Don't process children for a refresh
+      processChildren: false,
+      addedBy: username
+    });
+    
+    if (!result) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Failed to refresh the page. Try again later.' 
+      });
+    }
+    
+    res.json({
+      success: true,
+      message: 'Page refreshed successfully',
+      page: {
+        id: result._id,
+        title: result.title,
+        url: result.url,
+        lastUpdated: result.lastUpdated
+      }
+    });
+  } catch (error) {
+    console.error('Error refreshing page:', error);
+    res.status(500).json({ success: false, message: error.message });
   }
 }; 
