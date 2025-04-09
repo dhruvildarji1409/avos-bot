@@ -4,6 +4,7 @@ const chatBotController = require('../controllers/chatBotController');
 const confluenceController = require('../controllers/confluenceController');
 const authController = require('../controllers/authController');
 const authMiddleware = require('../middlewares/authMiddleware');
+const confluenceMcpController = require('../controllers/confluenceMcpController');
 
 const router = express.Router();
 
@@ -50,5 +51,16 @@ router.post('/confluence/admin/spaces', confluenceController.processSpace);
 router.delete('/confluence/admin/pages/:id', confluenceController.deletePage);
 router.get('/confluence/admin/stats', confluenceController.getStats);
 router.post('/confluence/admin/pages/:id/refresh', confluenceController.refreshPage);
+
+// Confluence MCP routes
+router.get('/confluence-mcp/search', confluenceMcpController.searchConfluence);
+router.get('/confluence-mcp/page/:pageId', confluenceMcpController.getPage);
+router.get('/confluence-mcp/page/:pageId/children', confluenceMcpController.getPageChildren);
+router.post('/confluence-mcp/page/:pageId/comment', authMiddleware, confluenceMcpController.addComment);
+router.post('/confluence-mcp/page', authMiddleware, confluenceMcpController.createPage);
+router.put('/confluence-mcp/page/:pageId', authMiddleware, confluenceMcpController.updatePage);
+router.get('/confluence-mcp/download/:pageIdOrUrl', confluenceMcpController.downloadPage);
+router.get('/confluence-mcp/page/:pageId/comments', confluenceMcpController.getComments);
+router.post('/confluence-mcp/store/:pageId', authMiddleware, confluenceMcpController.storePageInDatabase);
 
 module.exports = router; 

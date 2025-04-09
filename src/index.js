@@ -4,12 +4,19 @@ const chatRoutes = require('./api/routes');
 const path = require('path');
 const jwt = require('jsonwebtoken');
 const cookieParser = require('cookie-parser');
+const mcpClient = require('./utils/mcpClient');
 require('dotenv').config();
+
+// Make the MCP client globally available
+global.mcpClient = mcpClient;
 
 const app = express();
 
 // Connect to MongoDB
 connectDB();
+
+// Initialize MCP client
+mcpClient.initialize();
 
 // Middleware
 app.use(express.json());
@@ -36,7 +43,13 @@ const isAuthenticated = (req) => {
 
 // Middleware to check login for main pages
 const checkAuthForPage = (req, res, next) => {
-  const publicPages = ['/login', '/register', '/confluence-admin.html', '/confluence-section-debug.html'];
+  const publicPages = [
+    '/login', 
+    '/register', 
+    '/confluence-admin.html', 
+    '/confluence-section-debug.html',
+    '/confluence-mcp-test.html'
+  ];
   const isPublicPage = publicPages.includes(req.path);
   
   // If path is login page or has file extension, continue
@@ -99,6 +112,10 @@ app.get('/confluence-admin.html', (req, res) => {
 
 app.get('/confluence-section-debug.html', (req, res) => {
   res.sendFile(path.join(__dirname, '../public/confluence-section-debug.html'));
+});
+
+app.get('/confluence-mcp-test.html', (req, res) => {
+  res.sendFile(path.join(__dirname, '../public/confluence-mcp-test.html'));
 });
 
 // Serve the main HTML file for any other route

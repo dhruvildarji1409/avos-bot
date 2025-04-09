@@ -232,14 +232,20 @@ body {
     display: flex;
     margin-bottom: 15px;
     align-items: flex-start;
+    max-width: 85%;
 }
 
 .message.user {
     justify-content: flex-end;
+    align-self: flex-end;
+}
+
+.message.bot {
+    align-self: flex-start;
 }
 
 .message-content {
-    max-width: 80%;
+    width: 100%;
     padding: 12px 16px;
     border-radius: 12px;
     word-wrap: break-word;
@@ -259,6 +265,29 @@ body {
 
 .message-content p {
     margin: 0;
+}
+
+/* Style for the prompt source inside message content */
+.prompt-source {
+    font-size: 12px;
+    color: #666;
+    margin-bottom: 8px;
+    padding: 4px 8px;
+    background-color: rgba(0, 0, 0, 0.05);
+    border-radius: 4px;
+    display: inline-block;
+    border-left: 2px solid #1890ff;
+}
+
+.message.user .prompt-source {
+    color: rgba(255, 255, 255, 0.9);
+    background-color: rgba(0, 0, 0, 0.2);
+    border-left-color: white;
+}
+
+/* Ensure proper styling in answer card */
+#answer-card .prompt-source {
+    margin-bottom: 12px;
 }
 
 .message-content pre {
@@ -324,6 +353,31 @@ textarea:focus {
 
 #send-btn:hover {
     background-color: #689e00;
+}
+
+.go-search-btn {
+    background-color: #1890ff;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0 15px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background-color 0.2s;
+    font-weight: 600;
+    font-size: 14px;
+    white-space: nowrap;
+}
+
+.go-search-btn i {
+    margin-right: 5px;
+}
+
+.go-search-btn:hover {
+    background-color: #0c7cd5;
 }
 
 .typing-indicator {
@@ -511,4 +565,127 @@ textarea:focus {
 
 .admin-link:hover {
     background-color: #5a8d00;
+}
+
+.answer-actions button {
+    background: none;
+    border: none;
+    color: #555;
+    cursor: pointer;
+    padding: 5px 8px;
+    margin-left: 5px;
+    border-radius: 4px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+}
+
+.answer-actions button:hover {
+    background-color: #f0f0f0;
+}
+
+#go-search {
+    background-color: #76b900;
+    color: white;
+    font-weight: bold;
+    transition: background-color 0.2s;
+}
+
+#go-search:hover {
+    background-color: #64a000;
+}
+
+/* Answer Card Styles */
+.answer-card {
+    position: fixed;
+    bottom: 90px;
+    right: 20px;
+    width: 350px;
+    max-width: 90vw;
+    max-height: 70vh;
+    background-color: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    z-index: 100;
+}
+
+.answer-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background-color: #76b900;
+    color: white;
+}
+
+.answer-header h3 {
+    margin: 0;
+    font-size: 16px;
+}
+
+.answer-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.answer-actions button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: background-color 0.2s;
+}
+
+.answer-actions button:hover {
+    background-color: rgba(255, 255, 255, 0.2);
+}
+
+.answer-content {
+    padding: 16px;
+    overflow-y: auto;
+    max-height: calc(70vh - 100px);
+    font-size: 14px;
+    line-height: 1.5;
+}
+
+.sources-section {
+    padding: 8px 16px 16px;
+    border-top: 1px solid #eee;
+    background-color: #f9f9f9;
+}
+
+.sources-section h4 {
+    margin: 8px 0;
+    font-size: 14px;
+    color: #555;
+}
+
+.sources-section ul {
+    margin: 0;
+    padding-left: 20px;
+    list-style-type: disc;
+    font-size: 13px;
+}
+
+.sources-section li {
+    margin-bottom: 4px;
+}
+
+.sources-section a {
+    color: #1890ff;
+    text-decoration: none;
+}
+
+.sources-section a:hover {
+    text-decoration: underline;
 } 

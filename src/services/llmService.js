@@ -42,9 +42,9 @@ const callPythonLLM = async (prompt, context = '', systemPrompt = DEFAULT_LLM_PR
         
         // Fallback to simulated response if Python script fails
         const fallbackResponse = getSimulatedResponse(prompt, context);
-        resolve(fallbackResponse);
+        resolve({ response: fallbackResponse, promptSource: 'SIMULATED_KNOWLEDGE' });
       } else {
-        resolve(dataFromStdout);
+        resolve({ response: dataFromStdout, promptSource: systemPrompt ? 'CUSTOM_PROMPT' : 'DEFAULT_LLM_PROMPT' });
       }
     });
     
@@ -54,7 +54,7 @@ const callPythonLLM = async (prompt, context = '', systemPrompt = DEFAULT_LLM_PR
       
       // Fallback to simulated response if Python script fails to start
       const fallbackResponse = getSimulatedResponse(prompt, context);
-      resolve(fallbackResponse);
+      resolve({ response: fallbackResponse, promptSource: 'SIMULATED_KNOWLEDGE' });
     });
   });
 };
@@ -98,19 +98,50 @@ const getLLMResponse = async (prompt, context = '', systemPrompt = '', conversat
   try {
     console.log('Getting LLM response for prompt:', prompt);
     
+    let responseObj = { response: '', promptSource: '' };
+    
     // First, try to use the Python script to get a response
     try {
-      const pythonResponse = await callPythonLLM(prompt, context, systemPrompt, conversationHistory);
-      return pythonResponse;
+      responseObj = await callPythonLLM(prompt, context, systemPrompt, conversationHistory);
     } catch (pythonError) {
       console.error('Error calling Python LLM script:', pythonError);
       
       // If Python script fails, fall back to simulated response
-      return getSimulatedResponse(prompt, context);
+      const simResponse = getSimulatedResponse(prompt, context);
+      responseObj = { response: simResponse, promptSource: 'SIMULATED_KNOWLEDGE' };
     }
+    
+    // Identify which prompt was used
+    if (!responseObj.promptSource) {
+      if (systemPrompt) {
+        // Determine which named prompt was used
+        if (systemPrompt === DEFAULT_LLM_PROMPT) {
+          responseObj.promptSource = 'DEFAULT_LLM_PROMPT';
+        } else {
+          const promptsModule = require('../config/prompts');
+          for (const [key, value] of Object.entries(promptsModule)) {
+            if (typeof value === 'string' && value === systemPrompt) {
+              responseObj.promptSource = key;
+              break;
+            }
+          }
+          
+          if (!responseObj.promptSource) {
+            responseObj.promptSource = 'CUSTOM_PROMPT';
+          }
+        }
+      } else {
+        responseObj.promptSource = 'DEFAULT_LLM_PROMPT';
+      }
+    }
+    
+    return responseObj;
   } catch (error) {
     console.error('Error in LLM service:', error);
-    return "I'm sorry, I encountered an error while processing your request. Please try again later.";
+    return { 
+      response: "I'm sorry, I encountered an error while processing your request. Please try again later.", 
+      promptSource: 'ERROR_FALLBACK' 
+    };
   }
 };
 

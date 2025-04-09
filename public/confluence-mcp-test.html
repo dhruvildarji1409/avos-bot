@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Confluence MCP Test</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .result-container {
+            margin-top: 20px;
+            border: 1px solid #ddd;
+            padding: 15px;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+            max-height: 500px;
+            overflow-y: auto;
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        .form-control {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .btn {
+            padding: 8px 15px;
+            background-color: #76b900;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .btn:hover {
+            background-color: #64a300;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 20px;
+            border: 1px solid #eee;
+            border-radius: 5px;
+        }
+        pre {
+            background-color: #f0f0f0;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo">AVOS Bot</div>
+        <nav>
+            <a href="/">Chat</a>
+            <a href="/confluence-admin.html">Confluence Admin</a>
+            <a href="/confluence-mcp-test.html" class="active">Confluence MCP</a>
+        </nav>
+    </header>
+
+    <main class="container">
+        <h1>Confluence MCP Integration Test</h1>
+        <p>Use this page to test the Confluence MCP integration features.</p>
+
+        <div class="test-section">
+            <h2>Search Confluence</h2>
+            <div class="form-group">
+                <label for="search-query">Search Query:</label>
+                <input type="text" id="search-query" class="form-control" placeholder="Enter search terms">
+            </div>
+            <div class="form-group">
+                <label for="search-limit">Result Limit:</label>
+                <input type="number" id="search-limit" class="form-control" value="10" min="1" max="50">
+            </div>
+            <button id="search-btn" class="btn">Search</button>
+            <div id="search-results" class="result-container" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Get Confluence Page</h2>
+            <div class="form-group">
+                <label for="page-id">Page ID:</label>
+                <input type="text" id="page-id" class="form-control" placeholder="Enter page ID">
+            </div>
+            <div class="form-group">
+                <label for="include-metadata">
+                    <input type="checkbox" id="include-metadata" checked> Include Metadata
+                </label>
+            </div>
+            <button id="get-page-btn" class="btn">Get Page</button>
+            <div id="page-results" class="result-container" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Get Page Children</h2>
+            <div class="form-group">
+                <label for="parent-id">Parent Page ID:</label>
+                <input type="text" id="parent-id" class="form-control" placeholder="Enter parent page ID">
+            </div>
+            <div class="form-group">
+                <label for="include-content">
+                    <input type="checkbox" id="include-content"> Include Content
+                </label>
+            </div>
+            <button id="get-children-btn" class="btn">Get Children</button>
+            <div id="children-results" class="result-container" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Add Comment to Page</h2>
+            <div class="form-group">
+                <label for="comment-page-id">Page ID:</label>
+                <input type="text" id="comment-page-id" class="form-control" placeholder="Enter page ID">
+            </div>
+            <div class="form-group">
+                <label for="comment-text">Comment:</label>
+                <textarea id="comment-text" class="form-control" rows="3" placeholder="Enter your comment"></textarea>
+            </div>
+            <button id="add-comment-btn" class="btn">Add Comment</button>
+            <div id="comment-results" class="result-container" style="display: none;"></div>
+        </div>
+
+        <div class="test-section">
+            <h2>Store Page in Database</h2>
+            <div class="form-group">
+                <label for="store-page-id">Page ID:</label>
+                <input type="text" id="store-page-id" class="form-control" placeholder="Enter page ID">
+            </div>
+            <button id="store-page-btn" class="btn">Store in Database</button>
+            <div id="store-results" class="result-container" style="display: none;"></div>
+        </div>
+    </main>
+
+    <script>
+        // Helper function to display JSON results
+        function displayResults(containerId, data) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = `<pre>${JSON.stringify(data, null, 2)}</pre>`;
+            container.style.display = 'block';
+        }
+
+        // Search Confluence
+        document.getElementById('search-btn').addEventListener('click', async () => {
+            const query = document.getElementById('search-query').value;
+            const limit = document.getElementById('search-limit').value;
+            
+            if (!query) {
+                alert('Please enter a search query');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/confluence-mcp/search?query=${encodeURIComponent(query)}&limit=${limit}`);
+                const data = await response.json();
+                displayResults('search-results', data);
+            } catch (error) {
+                console.error('Error searching Confluence:', error);
+                displayResults('search-results', { error: error.message });
+            }
+        });
+
+        // Get Confluence Page
+        document.getElementById('get-page-btn').addEventListener('click', async () => {
+            const pageId = document.getElementById('page-id').value;
+            const includeMetadata = document.getElementById('include-metadata').checked;
+            
+            if (!pageId) {
+                alert('Please enter a page ID');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/confluence-mcp/page/${pageId}?includeMetadata=${includeMetadata}`);
+                const data = await response.json();
+                displayResults('page-results', data);
+            } catch (error) {
+                console.error('Error getting page:', error);
+                displayResults('page-results', { error: error.message });
+            }
+        });
+
+        // Get Page Children
+        document.getElementById('get-children-btn').addEventListener('click', async () => {
+            const parentId = document.getElementById('parent-id').value;
+            const includeContent = document.getElementById('include-content').checked;
+            
+            if (!parentId) {
+                alert('Please enter a parent page ID');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/confluence-mcp/page/${parentId}/children?includeContent=${includeContent}`);
+                const data = await response.json();
+                displayResults('children-results', data);
+            } catch (error) {
+                console.error('Error getting children:', error);
+                displayResults('children-results', { error: error.message });
+            }
+        });
+
+        // Add Comment to Page
+        document.getElementById('add-comment-btn').addEventListener('click', async () => {
+            const pageId = document.getElementById('comment-page-id').value;
+            const comment = document.getElementById('comment-text').value;
+            
+            if (!pageId) {
+                alert('Please enter a page ID');
+                return;
+            }
+            
+            if (!comment) {
+                alert('Please enter a comment');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/confluence-mcp/page/${pageId}/comment`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ comment })
+                });
+                const data = await response.json();
+                displayResults('comment-results', data);
+            } catch (error) {
+                console.error('Error adding comment:', error);
+                displayResults('comment-results', { error: error.message });
+            }
+        });
+
+        // Store Page in Database
+        document.getElementById('store-page-btn').addEventListener('click', async () => {
+            const pageId = document.getElementById('store-page-id').value;
+            
+            if (!pageId) {
+                alert('Please enter a page ID');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/confluence-mcp/store/${pageId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ addedBy: 'Test User' })
+                });
+                const data = await response.json();
+                displayResults('store-results', data);
+            } catch (error) {
+                console.error('Error storing page:', error);
+                displayResults('store-results', { error: error.message });
+            }
+        });
+    </script>
+</body>
+</html> 
