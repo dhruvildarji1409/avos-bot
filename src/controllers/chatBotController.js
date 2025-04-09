@@ -17,6 +17,7 @@ exports.handleChatMessage = async (req, res) => {
     }
     
     let botReply = '';
+    let promptSource = '';
     let context = '';
     let sources = [];
     
@@ -162,7 +163,10 @@ exports.handleChatMessage = async (req, res) => {
     // Get response from LLM
     try {
       // Use the centralized system prompt with conversation history
-      botReply = await llmService.getLLMResponse(message, context, MAIN_SYSTEM_PROMPT, conversationHistory);
+      const llmResponse = await llmService.getLLMResponse(message, context, MAIN_SYSTEM_PROMPT, conversationHistory);
+      
+      botReply = llmResponse.response;
+      promptSource = llmResponse.promptSource;
       
       // Add source attribution if context was used
       if (sources.length > 0) {
@@ -191,6 +195,7 @@ exports.handleChatMessage = async (req, res) => {
       } else {
         botReply = FALLBACK_RESPONSES.default;
       }
+      promptSource = 'FALLBACK_RESPONSES';
     }
     
     // Add user message to chat history
@@ -204,17 +209,93 @@ exports.handleChatMessage = async (req, res) => {
     activeSession.messages.push({
       sender: 'bot',
       message: botReply,
+      promptSource: promptSource,
       timestamp: new Date()
     });
     
     // Update session's lastUpdatedAt
     activeSession.lastUpdatedAt = new Date();
     
-    // Save updated chat history
-    await chatHistory.save();
+    // Save updated chat history with retry logic for version conflicts
+    let saved = false;
+    let retryCount = 0;
+    const maxRetries = 3;
+    
+    while (!saved && retryCount < maxRetries) {
+      try {
+        await chatHistory.save();
+        saved = true;
+      } catch (saveError) {
+        // Check if it's a version error
+        if (saveError.name === 'VersionError' && retryCount < maxRetries - 1) {
+          console.log(`Version conflict detected, retrying save (${retryCount + 1}/${maxRetries})...`);
+          
+          // Get fresh copy of chat history
+          chatHistory = await ChatHistory.findOne(
+            mongoose.Types.ObjectId.isValid(userId) ? { user: userId } : { userId }
+          );
+          
+          if (!chatHistory) {
+            console.error('Could not retrieve chat history for retry');
+            throw saveError;
+          }
+          
+          // Find the active session in the refreshed chat history
+          activeSession = chatHistory.sessions.find(s => s.sessionId === activeSessionId);
+          
+          if (!activeSession) {
+            // If session doesn't exist in the refreshed copy, create it
+            activeSession = {
+              sessionId: activeSessionId,
+              sessionName: `Chat ${new Date().toLocaleDateString()}`,
+              messages: [],
+              createdAt: new Date(),
+              lastUpdatedAt: new Date()
+            };
+            chatHistory.sessions.push(activeSession);
+            chatHistory.activeSessionId = activeSessionId;
+          }
+          
+          // Add the messages again to the refreshed session
+          if (!activeSession.messages.some(m => 
+              m.sender === 'user' && m.message === message && 
+              Math.abs(new Date(m.timestamp) - new Date()) < 60000)) {
+            activeSession.messages.push({
+              sender: 'user',
+              message: message,
+              timestamp: new Date()
+            });
+          }
+          
+          if (!activeSession.messages.some(m => 
+              m.sender === 'bot' && m.message === botReply && 
+              Math.abs(new Date(m.timestamp) - new Date()) < 60000)) {
+            activeSession.messages.push({
+              sender: 'bot',
+              message: botReply,
+              promptSource: promptSource,
+              timestamp: new Date()
+            });
+          }
+          
+          // Update lastUpdatedAt
+          activeSession.lastUpdatedAt = new Date();
+          
+          retryCount++;
+        } else {
+          // If it's not a version error or we've exceeded retries, rethrow
+          throw saveError;
+        }
+      }
+    }
+    
+    if (!saved) {
+      console.error('Failed to save chat history after multiple retries');
+    }
     
     res.json({ 
       reply: botReply,
+      promptSource: promptSource,
       sessionId: activeSessionId
     });
   } catch (error) {

@@ -101,6 +101,15 @@
       display: flex;
       gap: 5px;
     }
+    .button.info {
+      background-color: #e6f7ff;
+      color: #1890ff;
+      border-color: #91d5ff;
+    }
+    .button.info:hover {
+      background-color: #bae7ff;
+      border-color: #1890ff;
+    }
     .tab-container {
       margin-bottom: 20px;
     }
@@ -345,10 +354,8 @@
     // Auth check
     function checkAuth() {
       const token = localStorage.getItem('token');
-      if (!token) {
-        window.location.href = 'login.html';
-      }
-      return token;
+      // Return token even if null, don't redirect
+      return token || '';
     }
 
     // Tab functionality
@@ -380,7 +387,7 @@
         const response = await fetch('/api/confluence/admin/stats', {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${token}`,
+            'Authorization': token ? `Bearer ${token}` : '',
             'Content-Type': 'application/json'
           }
         });
@@ -403,40 +410,69 @@
           const recentPagesTable = document.getElementById('recent-pages').querySelector('tbody');
           recentPagesTable.innerHTML = '';
           
-          data.stats.latestPages.forEach(page => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-              <td>${page.title}</td>
-              <td>${page.addedBy}</td>
-              <td>${new Date(page.addedAt).toLocaleString()}</td>
-              <td>
-                <div class="btn-group">
-                  <button class="button small view-btn" data-id="${page._id}">View</button>
-                  <button class="button small secondary refresh-btn" data-id="${page._id}">Refresh</button>
-                </div>
-              </td>
-            `;
-            recentPagesTable.appendChild(row);
-          });
+          if (data.stats.latestPages && data.stats.latestPages.length > 0) {
+            data.stats.latestPages.forEach(page => {
+              const row = document.createElement('tr');
+              row.innerHTML = `
+                <td>${page.title}</td>
+                <td>${page.addedBy}</td>
+                <td>${new Date(page.addedAt).toLocaleString()}</td>
+                <td>
+                  <div class="btn-group">
+                    <button class="button small view-btn" data-id="${page._id}">View</button>
+                    <button class="button small info debug-sections-btn" data-id="${page._id}">Debug Sections</button>
+                    <button class="button small secondary refresh-btn" data-id="${page._id}">Refresh</button>
+                  </div>
+                </td>
+              `;
+              recentPagesTable.appendChild(row);
+            });
+          } else {
+            recentPagesTable.innerHTML = '<tr><td colspan="4">No pages found. Add some pages using the "Add Content" tab.</td></tr>';
+          }
           
           // Update space distribution table
           const spaceTable = document.getElementById('space-distribution').querySelector('tbody');
           spaceTable.innerHTML = '';
           
-          data.stats.bySpace.forEach(space => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-              <td>${space._id || 'Unknown'}</td>
-              <td>${space.count}</td>
-            `;
-            spaceTable.appendChild(row);
-          });
+          if (data.stats.bySpace && data.stats.bySpace.length > 0) {
+            data.stats.bySpace.forEach(space => {
+              const row = document.createElement('tr');
+              row.innerHTML = `
+                <td>${space._id || 'Unknown'}</td>
+                <td>${space.count}</td>
+              `;
+              spaceTable.appendChild(row);
+            });
+          } else {
+            spaceTable.innerHTML = '<tr><td colspan="2">No spaces found.</td></tr>';
+          }
         } else {
-          showToast(data.message, 'error');
+          // Show empty state instead of error
+          document.getElementById('total-pages').textContent = '0';
+          document.getElementById('total-spaces').textContent = '0';
+          document.getElementById('format-v1').textContent = '0';
+          document.getElementById('format-v2').textContent = '0';
+          
+          const recentPagesTable = document.getElementById('recent-pages').querySelector('tbody');
+          recentPagesTable.innerHTML = '<tr><td colspan="4">No pages found. Add some pages using the "Add Content" tab.</td></tr>';
+          
+          const spaceTable = document.getElementById('space-distribution').querySelector('tbody');
+          spaceTable.innerHTML = '<tr><td colspan="2">No spaces found.</td></tr>';
         }
       } catch (error) {
         console.error('Error loading stats:', error);
-        showToast('Failed to load stats', 'error');
+        // Show empty state instead of error alert
+        document.getElementById('total-pages').textContent = '0';
+        document.getElementById('total-spaces').textContent = '0';
+        document.getElementById('format-v1').textContent = '0';
+        document.getElementById('format-v2').textContent = '0';
+        
+        const recentPagesTable = document.getElementById('recent-pages').querySelector('tbody');
+        recentPagesTable.innerHTML = '<tr><td colspan="4">No pages found. Add some pages using the "Add Content" tab.</td></tr>';
+        
+        const spaceTable = document.getElementById('space-distribution').querySelector('tbody');
+        spaceTable.innerHTML = '<tr><td colspan="2">No spaces found.</td></tr>';
       } finally {
         hideSpinner();
       }
@@ -454,7 +490,7 @@
         const response = await fetch(`/api/confluence/admin/pages?page=${page}&limit=10&sortBy=${sortBy}&order=${order}`, {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${token}`,
+            'Authorization': token ? `Bearer ${token}` : '',
             'Content-Type': 'application/json'
           }
         });
@@ -469,32 +505,52 @@
           const pagesTable = document.getElementById('pages-table').querySelector('tbody');
           pagesTable.innerHTML = '';
           
-          data.pages.forEach(page => {
-            const row = document.createElement('tr');
-            row.innerHTML = `
-              <td>${page.title}</td>
-              <td>${page.spaceKey || 'Unknown'}</td>
-              <td>${page.addedBy}</td>
-              <td><span class="status-badge ${page.formatVersion === 2 ? 'status-v2' : 'status-v1'}">v${page.formatVersion || 1}</span></td>
-              <td>
-                <div class="btn-group">
-                  <button class="button small view-btn" data-id="${page._id}">View</button>
-                  <button class="button small secondary refresh-btn" data-id="${page._id}">Refresh</button>
-                  <button class="button small danger delete-btn" data-id="${page._id}">Delete</button>
-                </div>
-              </td>
-            `;
-            pagesTable.appendChild(row);
-          });
+          if (data.pages && data.pages.length > 0) {
+            data.pages.forEach(page => {
+              const row = document.createElement('tr');
+              row.innerHTML = `
+                <td>${page.title}</td>
+                <td>${page.spaceKey || 'Unknown'}</td>
+                <td>${page.addedBy}</td>
+                <td><span class="status-badge ${page.formatVersion === 2 ? 'status-v2' : 'status-v1'}">v${page.formatVersion || 1}</span></td>
+                <td>
+                  <div class="btn-group">
+                    <button class="button small view-btn" data-id="${page._id}">View</button>
+                    <button class="button small info debug-sections-btn" data-id="${page._id}">Debug Sections</button>
+                    <button class="button small secondary refresh-btn" data-id="${page._id}">Refresh</button>
+                    <button class="button small danger delete-btn" data-id="${page._id}">Delete</button>
+                  </div>
+                </td>
+              `;
+              pagesTable.appendChild(row);
+            });
+          } else {
+            pagesTable.innerHTML = '<tr><td colspan="5">No pages found. Add some pages using the "Add Content" tab.</td></tr>';
+          }
           
           // Update pagination
           updatePagination();
         } else {
-          showToast(data.message, 'error');
+          // Show empty state
+          const pagesTable = document.getElementById('pages-table').querySelector('tbody');
+          pagesTable.innerHTML = '<tr><td colspan="5">No pages found. Add some pages using the "Add Content" tab.</td></tr>';
+          
+          // Reset pagination
+          currentPage = 1;
+          totalPages = 1;
+          updatePagination();
         }
       } catch (error) {
         console.error('Error loading pages:', error);
-        showToast('Failed to load pages', 'error');
+        
+        // Show empty state instead of error
+        const pagesTable = document.getElementById('pages-table').querySelector('tbody');
+        pagesTable.innerHTML = '<tr><td colspan="5">No pages found. Add some pages using the "Add Content" tab.</td></tr>';
+        
+        // Reset pagination
+        currentPage = 1;
+        totalPages = 1;
+        updatePagination();
       } finally {
         hideSpinner();
       }
@@ -559,7 +615,7 @@
           const response = await fetch('/api/confluence/admin/pages', {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${token}`,
+              'Authorization': token ? `Bearer ${token}` : '',
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
@@ -576,12 +632,14 @@
             form.reset();
             // Reload stats
             loadStats();
+            // Reload pages list
+            loadPages();
           } else {
-            showToast(data.message, 'error');
+            showToast(data.message || 'Failed to add page', 'error');
           }
         } catch (error) {
           console.error('Error adding page:', error);
-          showToast('Failed to add page', 'error');
+          showToast('Failed to add page: ' + (error.message || 'Unknown error'), 'error');
         } finally {
           hideSpinner();
         }
@@ -604,7 +662,7 @@
           const response = await fetch('/api/confluence/admin/spaces', {
             method: 'POST',
             headers: {
-              'Authorization': `Bearer ${token}`,
+              'Authorization': token ? `Bearer ${token}` : '',
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({
@@ -616,16 +674,18 @@
           const data = await response.json();
           
           if (data.success) {
-            showToast(data.message);
+            showToast(data.message || 'Space processed successfully');
             form.reset();
             // Reload stats
             loadStats();
+            // Reload pages list
+            loadPages();
           } else {
-            showToast(data.message, 'error');
+            showToast(data.message || 'Failed to process space', 'error');
           }
         } catch (error) {
           console.error('Error processing space:', error);
-          showToast('Failed to process space', 'error');
+          showToast('Failed to process space: ' + (error.message || 'Unknown error'), 'error');
         } finally {
           hideSpinner();
         }
@@ -668,6 +728,12 @@
           window.open(`/index.html?doc=${id}`, '_blank');
         }
         
+        // Debug sections button
+        if (e.target.classList.contains('debug-sections-btn')) {
+          const id = e.target.getAttribute('data-id');
+          window.location.href = `/confluence-section-debug.html?id=${id}`;
+        }
+        
         // Refresh button
         if (e.target.classList.contains('refresh-btn')) {
           const id = e.target.getAttribute('data-id');
@@ -677,7 +743,7 @@
             const response = await fetch(`/api/confluence/admin/pages/${id}/refresh`, {
               method: 'POST',
               headers: {
-                'Authorization': `Bearer ${token}`,
+                'Authorization': token ? `Bearer ${token}` : '',
                 'Content-Type': 'application/json'
               }
             });
@@ -696,11 +762,11 @@
                 );
               }
             } else {
-              showToast(data.message, 'error');
+              showToast(data.message || 'Failed to refresh page', 'error');
             }
           } catch (error) {
             console.error('Error refreshing page:', error);
-            showToast('Failed to refresh page', 'error');
+            showToast('Failed to refresh page: ' + (error.message || 'Unknown error'), 'error');
           } finally {
             hideSpinner();
           }
@@ -716,7 +782,7 @@
               const response = await fetch(`/api/confluence/admin/pages/${id}`, {
                 method: 'DELETE',
                 headers: {
-                  'Authorization': `Bearer ${token}`,
+                  'Authorization': token ? `Bearer ${token}` : '',
                   'Content-Type': 'application/json'
                 }
               });
@@ -735,11 +801,11 @@
                   );
                 }
               } else {
-                showToast(data.message, 'error');
+                showToast(data.message || 'Failed to delete page', 'error');
               }
             } catch (error) {
               console.error('Error deleting page:', error);
-              showToast('Failed to delete page', 'error');
+              showToast('Failed to delete page: ' + (error.message || 'Unknown error'), 'error');
             } finally {
               hideSpinner();
             }
