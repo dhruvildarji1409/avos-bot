@@ -104,3 +104,36 @@ To generate embeddings for existing content in the database:
 ```
 npm run generate-embeddings
 ```
+
+## Repository Structure
+
+The repository has been cleaned up and organized as follows:
+
+- `src/`: Core application code
+  - `api/`: API routes and controllers
+  - `config/`: Application configuration
+  - `controllers/`: Request handlers
+  - `db/`: Database access and query functions
+  - `middlewares/`: Express middleware functions
+  - `models/`: MongoDB models
+  - `services/`: Business logic and external service integrations
+  - `utils/`: Utility functions
+  - `test-utils/`: Testing and debugging utilities (not used in production)
+
+- `scripts/`: Helper scripts and utilities
+  - Contains scripts for Confluence integration and testing
+
+- `docs/`: Documentation
+
+- `public/`: Static assets for web interface
+
+## Development Notes
+
+- Configuration files: Copy `.env.example` to `.env` and update with your credentials
+- For script configuration, copy `scripts/.env.example` to `scripts/.env`
+- Test files are organized in `src/test-utils/` to keep the main source directory clean
+- The MCP (Model Control Protocol) integration is located in the `mcp-confluence/` directory
+
+> **Important:** While typically .env files should not be committed to a repository for security reasons, 
+> this project keeps them in version control for development convenience. Make sure to use placeholders 
+> for sensitive values when sharing the repository, and rotate any exposed API tokens.
