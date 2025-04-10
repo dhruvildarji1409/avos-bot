@@ -137,3 +137,127 @@ The repository has been cleaned up and organized as follows:
 > **Important:** While typically .env files should not be committed to a repository for security reasons, 
 > this project keeps them in version control for development convenience. Make sure to use placeholders 
 > for sensitive values when sharing the repository, and rotate any exposed API tokens.
+
+## AVOS Bot - Confluence Integration
+
+This repository contains the code for the AVOS Bot with Confluence integration.
+
+### Overview
+
+The AVOS Bot can now search and index Confluence pages, providing accurate responses to user queries based on Confluence content. The system uses:
+
+- Header-based chunking of Confluence pages
+- OpenAI embeddings for semantic search
+- Graph-based retrieval for more accurate answers
+- Recursive page loading to capture linked content
+
+### Setup
+
+1. Install dependencies:
+
+```bash
+# Node.js dependencies
+npm install
+
+# Python dependencies (in virtual environment)
+source venv/bin/activate
+pip install atlassian-python-api beautifulsoup4 pymongo python-dotenv
+```
+
+2. Configure environment variables by copying `.env.example` to `.env` and updating the values:
+
+```bash
+cp .env.example .env
+```
+
+3. Start MongoDB:
+
+```bash
+# Start MongoDB (if not already running)
+mongod --dbpath /path/to/data/db
+```
+
+### Loading Confluence Content
+
+There are multiple ways to load Confluence content:
+
+#### 1. Using the command-line utility
+
+```bash
+# Load a specific Confluence page with default settings (recursive with depth 3)
+node scripts/load_confluence.js https://confluence.nvidia.com/display/SPACE/Page
+
+# Load multiple pages
+node scripts/load_confluence.js https://confluence.nvidia.com/display/SPACE/Page1 https://confluence.nvidia.com/display/SPACE/Page2
+
+# Load without recursion
+node scripts/load_confluence.js --no-recursive https://confluence.nvidia.com/display/SPACE/Page
+
+# Set recursion depth
+node scripts/load_confluence.js --depth 2 https://confluence.nvidia.com/display/SPACE/Page
+```
+
+#### 2. Using the Python script directly
+
+```bash
+# From a manifest file
+python admin_load_confluence.py file manifest.txt --recursive
+
+# Add pages directly
+python admin_load_confluence.py add https://confluence.nvidia.com/display/SPACE/Page --recursive
+
+# Search content
+python admin_load_confluence.py search "your query here" --limit 5
+```
+
+#### 3. Using the API (for Admins)
+
+POST to `/api/admin/confluence/load` with the following body:
+
+```json
+{
+  "urls": ["https://confluence.nvidia.com/display/SPACE/Page"],
+  "recursive": true,
+  "depth": 3
+}
+```
+
+### Searching Confluence Content
+
+#### Using the API
+
+POST to `/api/search/confluence` with the following body:
+
+```json
+{
+  "query": "your search query",
+  "limit": 5
+}
+```
+
+### Running the Server
+
+```bash
+# Start the server
+npm run dev
+```
+
+### Architecture
+
+The integration consists of:
+
+1. **Confluence Loader**: Python-based loader that extracts content from Confluence
+2. **Header-Based Chunker**: Splits content into semantic chunks based on headers
+3. **MongoDB Storage**: Stores content with graph relationships between chunks
+4. **API Integration**: RESTful API for loading and searching content
+
+### Admin Features
+
+- Load and index Confluence pages
+- Update Confluence credentials
+- Search indexed content
+- View statistics about indexed content
+
+### Contributing
+
+Please follow the established code style and patterns. Include proper error handling and tests for new features.
